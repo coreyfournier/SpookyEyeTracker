@@ -44,6 +44,16 @@ def boss(sign):
     h = cyl_x(1.5, 38, 53) if sign > 0 else cyl_x(1.5, -53, -38)
     return b, h
 
+def rear_boss_supports():
+    """Snap-off blocks for printing the rear seam-down: each pivot boss's flat face sits
+    3.6mm above the bed with only air under its inner part (the lip socket is bored out).
+    Stops PRINT_GAP below the boss and clears the socket bore wall (r 47.65)."""
+    s = M()
+    for sign in (1, -1):
+        x0, x1 = (40.3, 47.0) if sign > 0 else (-47.0, -40.3)
+        s += box(x0, x1, SEAM - 3.6 + PRINT_GAP, SEAM, -4.2, 4.2)
+    return s
+
 def eye_full():
     e = shell(R_EYE, R_EYE - T_EYE)
     bosses, holes = M(), M()
@@ -139,7 +149,9 @@ def led_insert():
 
 # ---------------- YOKE (inside eye) ----------------
 def yoke():
-    y = box(-39.6, 39.6, -4, 4, -4, 4) + cyl_z(7, -4.8, 4.8)
+    # arms are as tall as the hub (+-4.8) so the part prints flat; with +-4 arms they hung
+    # 0.8mm above the bed. The hub already keeps this 0.2mm clearance to the stalk plates.
+    y = box(-39.6, 39.6, -4, 4, -4.8, 4.8) + cyl_z(7, -4.8, 4.8)
     y -= cyl_z(PIN, -10, 10)
     y -= cyl_x(PIN, 26, 41) + cyl_x(PIN, -41, -26)
     return y
@@ -261,7 +273,8 @@ if __name__ == "__main__":
     printable = dict(
         eye_front=(front + front_rim_support()).rotate([90, 0, 0]),   # split face down, snap-off rim support
         eye_front_nosupport=front.rotate([90, 0, 0]),                 # for slicer-generated supports
-        eye_rear=rear.rotate([-90, 0, 0]),
+        eye_rear=(rear + rear_boss_supports()).rotate([-90, 0, 0]),   # snap-off boss supports
+        eye_rear_nosupport=rear.rotate([-90, 0, 0]),
         yoke=yk, stalk=st.rotate([0, 90, 0]), led_insert=li.rotate([90, 0, 0]),
         frame=fr, lid_upper=lu, lid_lower=ll)
     for k, v in printable.items():
