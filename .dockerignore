@@ -1,0 +1,5 @@
+**
+!tracker/requirements.txt
+!tracker/config.default.yaml
+!tracker/eyetracker/**
+**/__pycache__

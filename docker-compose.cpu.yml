@@ -1,0 +1,8 @@
+# CPU-only override:  docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
+services:
+  tracker:
+    image: ghcr.io/coreyfournier/spookyeyetracker:cpu
+    build:
+      args:
+        TORCH_VARIANT: cpu
+    deploy: !reset {}

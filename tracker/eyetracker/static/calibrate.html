@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Eye Calibration</title>
+<style>
+  :root {
+    --bg: #f5f5f4; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --accent: #c2410c; --ok: #15803d; --warn: #b45309; --bad: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0a09; --panel: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524;
+      --accent: #fb923c; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 12px 16px 40px; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; }
+  header a { color: var(--muted); font-size: 14px; }
+  select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
+  .big { font-size: 20px; font-weight: 600; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); } .dot.warn { background: var(--warn); }
+  .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+  .pad button { aspect-ratio: 1.6; font-size: 28px; }
+  button { font: inherit; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    padding: 10px 12px; cursor: pointer; touch-action: manipulation; }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.wide { width: 100%; padding: 14px; font-size: 18px; }
+  button:disabled { opacity: .45; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; flex: 1; padding: 8px; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .row > * { flex: 1; }
+  .us { font-variant-numeric: tabular-nums; text-align: center; color: var(--muted); font-size: 14px; }
+  ol { padding-left: 22px; margin: 0; } li { margin: 4px 0; font-size: 14px; }
+  li button { padding: 2px 8px; margin-left: 6px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  td, th { padding: 4px 6px; text-align: right; border-bottom: 1px solid var(--line); }
+  td:first-child, th:first-child { text-align: left; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg);
+    padding: 10px 16px; border-radius: 10px; font-size: 15px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>👁 Calibrate by pointing</h1>
+    <select id="eye" aria-label="Eye"></select>
+    <a href="/">Main UI</a>
+  </header>
+
+  <div class="card">
+    <h2>Who the cameras see</h2>
+    <div id="target" class="big">…</div>
+    <div id="targetSub" class="muted"></div>
+    <div id="eyeStat" class="muted" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Point the eye at you</h2>
+    <button class="wide primary" id="snap">Snap to me</button>
+    <div class="pad">
+      <span></span><button id="up" aria-label="Up">▲</button><span></span>
+      <button id="left" aria-label="Your left">◀</button>
+      <button id="release" style="font-size:14px">Release</button>
+      <button id="right" aria-label="Your right">▶</button>
+      <span></span><button id="down" aria-label="Down">▼</button><span></span>
+    </div>
+    <div class="row">
+      <div class="seg" id="step"><button data-s="0.5" class="on">Fine</button><button data-s="3">Coarse</button></div>
+      <button id="flipPan">Flip ◀▶</button><button id="flipTilt">Flip ▲▼</button>
+    </div>
+    <div class="us" id="us">not controlling the eye</div>
+    <div class="muted" style="margin-top:8px">Arrows move the eye as you see it, facing it. Stand still with your eyes level, then nudge
+      the eye until it looks right at you. If an arrow moves the wrong way, tap Flip.</div>
+    <button class="wide primary" id="capture" style="margin-top:12px">Capture this spot</button>
+  </div>
+
+  <div class="card">
+    <h2>Samples <span id="count"></span></h2>
+    <ol id="samples"></ol>
+    <div class="muted" id="hint" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Fit</h2>
+    <table id="fit"></table>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="apply">Apply — Save &amp; Push</button>
+      <button id="clear">Clear samples</button>
+    </div>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+const $ = s => document.querySelector(s);
+const api = async (path, body) => {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)});
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+};
+const toast = msg => { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove('show'), 2500); };
+
+let eyeId = null, data = null, active = false, panUs = 1500, tiltUs = 1500, stepDeg = 0.5;
+const flip = {pan: 1, tilt: 1};
+
+function send() {
+  active = true;
+  panUs = Math.max(500, Math.min(2500, Math.round(panUs)));
+  tiltUs = Math.max(500, Math.min(2500, Math.round(tiltUs)));
+  $('#us').textContent = `pan ${panUs} µs · tilt ${tiltUs} µs`;
+  api(`/api/eyes/${eyeId}/manual`, {pan: 0, tilt: 0, lid: 1, raw: [panUs, tiltUs, 0, 0], hold_s: 20})
+    .catch(e => toast(e.message));
+}
+function startFromPrediction() {
+  const t = data?.target, cur = data?.current;
+  if (t) { panUs = t.pred_pan_us; tiltUs = t.pred_tilt_us; }
+  else if (cur) { panUs = cur.pan.center; tiltUs = cur.tilt.center; }
+}
+function nudge(axis, dir) {
+  if (!active) startFromPrediction();
+  const k = data?.current?.[axis]?.us_per_deg || 30;   // signed, so arrows follow the servo direction
+  const d = dir * stepDeg * k * flip[axis];
+  if (axis === 'pan') panUs += d; else tiltUs += d;
+  send();
+}
+// ◀ = toward your left as you face the eye = the eye's +pan
+$('#left').onclick = () => nudge('pan', +1);
+$('#right').onclick = () => nudge('pan', -1);
+$('#up').onclick = () => nudge('tilt', +1);
+$('#down').onclick = () => nudge('tilt', -1);
+$('#snap').onclick = () => {
+  if (!data?.target) return toast('Nobody detected — step into view');
+  startFromPrediction(); send();
+};
+$('#release').onclick = () => { active = false; $('#us').textContent = 'not controlling the eye';
+  api(`/api/eyes/${eyeId}/release`, {}); };
+$('#flipPan').onclick = () => { flip.pan *= -1; $('#flipPan').classList.toggle('primary', flip.pan < 0); };
+$('#flipTilt').onclick = () => { flip.tilt *= -1; $('#flipTilt').classList.toggle('primary', flip.tilt < 0); };
+document.querySelectorAll('#step button').forEach(b => b.onclick = () => {
+  stepDeg = parseFloat(b.dataset.s);
+  document.querySelectorAll('#step button').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#capture').onclick = async () => {
+  if (!active) return toast('Point the eye at yourself first');
+  try { await api(`/api/calib/${eyeId}/capture`, {pan_us: panUs, tilt_us: tiltUs}); toast('Captured ✓ — move to a new spot');
+        refresh(); }
+  catch (e) { toast(e.message); }
+};
+$('#apply').onclick = async () => {
+  try {
+    const r = await api(`/api/calib/${eyeId}/apply`, {});
+    toast(r.pushed ? 'Saved and pushed ✓' : 'Saved, but the eye did not acknowledge — use Push in the main UI');
+    refresh();
+  } catch (e) { toast(e.message); }
+};
+$('#clear').onclick = async () => {
+  if (!confirm('Delete all samples for this eye?')) return;
+  await api(`/api/calib/${eyeId}/clear`, {}); refresh();
+};
+$('#eye').onchange = () => { eyeId = $('#eye').value; active = false; refresh(); };
+
+function render() {
+  const t = data.target, e = data.eye;
+  if (t) {
+    const h = t.face_h ? `${t.face_h.toFixed(2)} m (${t.height_src === 'stereo' ? 'both cameras' : 'one camera'})`
+      : 'not measured — using default';
+    $('#target').innerHTML = `<span class="dot ok"></span>Person #${t.id}, ${t.dist} m away`;
+    $('#targetSub').textContent = `at (${t.x}, ${t.y}) m · eye level ${h} · pan ${t.pan}° tilt ${t.tilt}°`;
+  } else {
+    $('#target').innerHTML = '<span class="dot bad"></span>Nobody detected';
+    $('#targetSub').textContent = 'Step into view of a camera.';
+  }
+  $('#eyeStat').innerHTML = e.online ? `<span class="dot ok"></span>Eye online · ${e.state} · ${e.rssi} dBm`
+    : '<span class="dot bad"></span>Eye offline';
+  $('#capture').disabled = !t;
+
+  const s = data.samples;
+  $('#count').textContent = `(${s.length})`;
+  $('#samples').innerHTML = s.map((x, i) => `<li>(${x.x.toFixed(1)}, ${x.y.toFixed(1)}) m, eyes ${x.face_h ? x.face_h.toFixed(2) + ' m' : '—'}
+      → ${x.pan_us}/${x.tilt_us} µs <button data-del="${i}" aria-label="Delete sample">✕</button></li>`).join('');
+  $('#samples').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    await api(`/api/calib/${eyeId}/delete`, {index: +b.dataset.del}); refresh(); });
+  const pans = s.map(x => x.pan), spread = pans.length ? Math.max(...pans) - Math.min(...pans) : 0;
+  $('#hint').textContent = !s.length ? 'Start near the middle of the yard. One sample sets zero.'
+    : spread < 8 ? 'Add spots further left and right (and one closer, one further) so scale can be fitted too.'
+    : 'Good spread. Apply, then walk around and check the eye follows you.';
+
+  const f = data.fit, c = data.current;
+  const row = (axis) => {
+    const r = f[axis];
+    return `<tr><td>${axis}</td><td>${c[axis].center} → <b>${r ? r.center : '—'}</b></td>
+      <td>${c[axis].us_per_deg} → <b>${r ? r.us_per_deg : '—'}</b></td><td>${r ? r.rms_deg + '°' : '—'}</td></tr>
+      ${r ? `<tr><td></td><td colspan="3" class="muted" style="text-align:left">${r.mode}, ${r.n} sample${r.n > 1 ? 's' : ''}</td></tr>` : ''}`;
+  };
+  $('#fit').innerHTML = `<tr><th></th><th>centre µs</th><th>µs/deg</th><th>error</th></tr>${row('pan')}${row('tilt')}`;
+  $('#apply').disabled = !s.length;
+}
+
+async function refresh() {
+  if (!eyeId) return;
+  try { data = await api(`/api/calib/${eyeId}`); render(); } catch (e) { /* tracker restarting */ }
+}
+
+(async () => {
+  const cfg = await api('/api/config');
+  $('#eye').innerHTML = cfg.eyes.map(e => `<option value="${e.id}">${e.name || e.id}</option>`).join('');
+  eyeId = cfg.eyes[0]?.id;
+  await refresh();
+  setInterval(refresh, 500);
+  setInterval(() => { if (active) send(); }, 5000);   // keep manual control alive
+})();
+</script>
+</body>
+</html>

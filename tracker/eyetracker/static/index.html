@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eye Tracker</title>
+<style>
+  :root {
+    --bg: #f5f5f4; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --accent: #c2410c; --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --map: #fafaf9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0a09; --panel: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524;
+      --accent: #fb923c; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --map: #141210;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line);
+           background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  nav button { background: none; border: 0; color: var(--muted); padding: 6px 10px; cursor: pointer; font: inherit; border-radius: 6px; }
+  nav button.active { color: var(--text); background: var(--bg); font-weight: 600; }
+  #chips { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--bad); }
+  main { padding: 16px; max-width: 1500px; margin: 0 auto; }
+  section.tab { display: none; } section.tab.active { display: block; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .card h2 { font-size: 15px; margin: 0 0 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .card h2 small { color: var(--muted); font-weight: 400; }
+  .cam img { width: 100%; border-radius: 6px; background: #000; aspect-ratio: 16/9; object-fit: contain; display: block; }
+  #map { width: 100%; height: 520px; border-radius: 6px; background: var(--map); cursor: crosshair; display: block; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 6px 10px 10px; }
+  legend { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; }
+  .field { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .field label { min-width: 110px; color: var(--muted); }
+  input[type=number], input[type=text], select { background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 6px; font: inherit; width: 90px; }
+  input[type=text] { width: 180px; }
+  input[type=color] { width: 44px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
+  .vec { display: flex; gap: 4px; } .vec input { width: 70px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  button.btn { border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 6px 12px; border-radius: 6px;
+    cursor: pointer; font: inherit; }
+  button.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.btn:disabled { opacity: .5; cursor: default; }
+  .msg { color: var(--muted); font-size: 13px; }
+  .slider { display: grid; grid-template-columns: 110px 1fr 60px auto; gap: 8px; align-items: center; margin: 4px 0; }
+  .slider span { color: var(--muted); } .slider output { font-variant-numeric: tabular-nums; text-align: right; }
+  .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
+  .two { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
+  @media (max-width: 600px) { .slider { grid-template-columns: 80px 1fr 50px; } .slider button { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>👁 Eye Tracker</h1>
+  <nav>
+    <button data-tab="live" class="active">Live</button>
+    <button data-tab="eyes">Eyes</button>
+    <button data-tab="cameras">Cameras</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+  <a href="/calibrate" style="color:var(--accent)">Calibrate by pointing ↗</a>
+  <div id="chips"></div>
+</header>
+<main>
+  <section class="tab active" id="tab-live">
+    <div class="grid" id="cams"></div>
+    <div class="card" style="margin-top:16px">
+      <h2>Yard map <small>top-down, metres · street is up · click to point</small>
+        <select id="mapEye" title="Eye to point when clicking the map"></select></h2>
+      <canvas id="map"></canvas>
+      <div class="hint">Stand somewhere you can measure (e.g. 5 m out from the eye) and compare with the dot.
+        Adjust camera position/heading/pitch on the Cameras tab until the dot and the grid overlay line up.</div>
+    </div>
+  </section>
+  <section class="tab" id="tab-eyes"><div class="grid" id="eyes"></div></section>
+  <section class="tab" id="tab-cameras"><div class="grid" id="cameraForms"></div></section>
+  <section class="tab" id="tab-settings"><div class="card" id="settings"></div></section>
+</main>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const api = async (path, body) => {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)});
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+};
+let config = null, state = null;
+
+// ---------- tabs ----------
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + b.dataset.tab));
+  if (b.dataset.tab === 'live') resizeMap();
+});
+
+// ---------- generic form builder ----------
+const COLOR_KEYS = new Set(['idle', 'track', 'sleep', 'pupil']);
+const toHex = c => '#' + c.map(v => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
+const fromHex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+
+function buildForm(obj, path = [], skip = new Set()) {
+  const frag = document.createDocumentFragment();
+  for (const [k, v] of Object.entries(obj)) {
+    if (skip.has(k)) continue;
+    const p = [...path, k], id = p.join('.');
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const fs = document.createElement('fieldset');
+      fs.innerHTML = `<legend>${k.replace(/_/g, ' ')}</legend>`;
+      fs.appendChild(buildForm(v, p));
+      frag.appendChild(fs);
+      continue;
+    }
+    const row = document.createElement('div');
+    row.className = 'field';
+    row.innerHTML = `<label>${k.replace(/_/g, ' ')}</label>`;
+    let input;
+    if (typeof v === 'boolean') {
+      input = Object.assign(document.createElement('input'), {type: 'checkbox', checked: v});
+    } else if (Array.isArray(v) && v.length === 3 && COLOR_KEYS.has(k)) {
+      input = Object.assign(document.createElement('input'), {type: 'color', value: toHex(v)});
+      input.dataset.kind = 'color';
+    } else if (Array.isArray(v)) {
+      input = document.createElement('div');
+      input.className = 'vec';
+      input.dataset.kind = 'vec';
+      v.forEach(n => input.appendChild(Object.assign(document.createElement('input'), {type: 'number', step: 'any', value: n})));
+    } else if (typeof v === 'number') {
+      input = Object.assign(document.createElement('input'), {type: 'number', step: 'any', value: v});
+    } else {
+      input = Object.assign(document.createElement('input'), {type: 'text', value: v ?? ''});
+    }
+    input.dataset.path = id;
+    row.appendChild(input);
+    frag.appendChild(row);
+  }
+  return frag;
+}
+
+function readForm(root, base) {
+  const out = structuredClone(base);
+  root.querySelectorAll('[data-path]').forEach(el => {
+    const keys = el.dataset.path.split('.');
+    let o = out;
+    keys.slice(0, -1).forEach(k => o = o[k]);
+    const k = keys.at(-1), old = o[k];
+    if (el.type === 'checkbox') o[k] = el.checked;
+    else if (el.dataset.kind === 'color') o[k] = fromHex(el.value);
+    else if (el.dataset.kind === 'vec') o[k] = [...el.querySelectorAll('input')].map(i => parseFloat(i.value));
+    else if (typeof old === 'number') o[k] = parseFloat(el.value);
+    else o[k] = el.value;
+  });
+  return out;
+}
+
+function setField(root, path, value) {
+  const el = root.querySelector(`[data-path="${path}"]`);
+  if (el) { el.value = value; el.dispatchEvent(new Event('input', {bubbles: true})); }
+}
+
+// ---------- eyes ----------
+function throttle(fn, ms) {
+  let last = 0, timer = null;
+  return (...a) => {
+    const wait = ms - (Date.now() - last);
+    clearTimeout(timer);
+    if (wait <= 0) { last = Date.now(); fn(...a); }
+    else timer = setTimeout(() => { last = Date.now(); fn(...a); }, wait);
+  };
+}
+
+function eyeCard(eye) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <h2>${eye.name || eye.id} <small>${eye.id} · ${eye.ip}:${eye.port}</small> <span class="chip" data-status>…</span></h2>
+    <div class="two">
+      <div data-form></div>
+      <div>
+        <fieldset><legend>Calibration (manual control)</legend>
+          <div class="hint">Moving a slider takes over the eye for 15 s. Use raw µs to find each servo's centre / open / closed
+            positions, then press the button to copy it into the form. Save &amp; Push when done.</div>
+          <div data-sliders></div>
+          <div class="row"><button class="btn" data-center>Centre</button><button class="btn" data-release>Release to tracking</button></div>
+        </fieldset>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn primary" data-savepush>Save &amp; Push</button>
+      <button class="btn" data-push title="Re-send the saved config (e.g. if the last push did not reach the eye)">Push</button>
+      <span class="msg" data-msg></span>
+    </div>`;
+  const form = $('[data-form]', card);
+  form.appendChild(buildForm(eye, [], new Set(['id'])));
+  const msg = $('[data-msg]', card);
+  let dirty = false;
+  form.addEventListener('input', () => { dirty = true; msg.textContent = 'Unsaved changes'; });
+
+  // manual sliders
+  const sliders = $('[data-sliders]', card);
+  const defs = [
+    ['pan', 'Pan °', -45, 45, 0.5, 0], ['tilt', 'Tilt °', -30, 30, 0.5, 0], ['lid', 'Lids open', 0, 1, 0.01, 1],
+    ['raw0', 'Pan µs', 0, 2500, 5, 0, 'servos.pan.center', 'Set centre'],
+    ['raw1', 'Tilt µs', 0, 2500, 5, 0, 'servos.tilt.center', 'Set centre'],
+    ['raw2', 'Upper lid µs', 0, 2500, 5, 0, ['firmware.servos.lid_upper.open', 'firmware.servos.lid_upper.closed'], ['Open', 'Closed']],
+    ['raw3', 'Lower lid µs', 0, 2500, 5, 0, ['firmware.servos.lid_lower.open', 'firmware.servos.lid_lower.closed'], ['Open', 'Closed']],
+  ];
+  const vals = {};
+  const send = throttle(() => api(`/api/eyes/${eye.id}/manual`, {
+    pan: vals.pan, tilt: vals.tilt, lid: vals.lid, raw: [vals.raw0, vals.raw1, vals.raw2, vals.raw3], hold_s: 15,
+  }).catch(e => msg.textContent = e.message), 80);
+  for (const [key, label, min, max, step, init, target, btn] of defs) {
+    vals[key] = init;
+    const row = document.createElement('div');
+    row.className = 'slider';
+    row.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${init}"><output>${key.startsWith('raw') ? 'off' : init}</output><span></span>`;
+    const range = $('input', row), out = $('output', row);
+    range.oninput = () => {
+      vals[key] = parseFloat(range.value);
+      out.textContent = key.startsWith('raw') ? (vals[key] < 500 ? 'off' : vals[key]) : vals[key];
+      if (key.startsWith('raw') && vals[key] < 500) vals[key] = 0;
+      send();
+    };
+    if (target) {
+      const targets = Array.isArray(target) ? target : ['firmware.' + target];
+      const labels = Array.isArray(btn) ? btn : [btn];
+      const holder = row.lastElementChild;
+      targets.forEach((t, i) => {
+        const b = Object.assign(document.createElement('button'), {className: 'btn', textContent: labels[i]});
+        b.onclick = () => { if (vals[key] >= 500) setField(form, t, vals[key]); };
+        holder.appendChild(b);
+      });
+    }
+    sliders.appendChild(row);
+  }
+  $('[data-center]', card).onclick = () => {
+    sliders.querySelectorAll('input[type=range]').forEach((r, i) => { r.value = defs[i][5]; r.oninput(); });
+  };
+  $('[data-release]', card).onclick = () => api(`/api/eyes/${eye.id}/release`, {});
+
+  const setBusy = b => card.querySelectorAll('[data-savepush],[data-push]').forEach(x => x.disabled = b);
+  $('[data-savepush]', card).onclick = async () => {
+    setBusy(true); msg.textContent = 'Saving…';
+    try {
+      const updated = readForm(form, eye);
+      const r = await api(`/api/eyes/${eye.id}/save_push`, updated);
+      Object.assign(eye, updated); dirty = false;
+      msg.textContent = r.pushed ? 'Saved and pushed ✓' : 'Saved, but the eye did not acknowledge — check it is online, then Push';
+    } catch (e) { msg.textContent = 'Error: ' + e.message; }
+    setBusy(false);
+  };
+  $('[data-push]', card).onclick = async () => {
+    setBusy(true); msg.textContent = 'Pushing…';
+    try {
+      const r = await api(`/api/eyes/${eye.id}/push`, {});
+      msg.textContent = (r.pushed ? 'Pushed ✓' : 'No acknowledgement from eye') + (dirty ? ' (unsaved form changes were not sent)' : '');
+    } catch (e) { msg.textContent = 'Error: ' + e.message; }
+    setBusy(false);
+  };
+  card.isDirty = () => dirty;
+  card.updateStatus = st => {
+    const s = $('[data-status]', card);
+    s.innerHTML = !st || !st.online ? '<span class="dot bad"></span>offline'
+      : `<span class="dot ${st.config_in_sync ? 'ok' : 'warn'}"></span>${st.state} · ${st.config_in_sync ? 'config synced' : 'config differs'} · ${st.rssi} dBm`;
+  };
+  return card;
+}
+
+// ---------- cameras & settings ----------
+function simpleCard(title, obj, skip, onSave) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `<h2>${title}</h2><div data-form></div><div class="row"><button class="btn primary">Save</button><span class="msg"></span></div>`;
+  const form = $('[data-form]', card);
+  form.appendChild(buildForm(obj, [], skip));
+  const msg = $('.msg', card);
+  form.addEventListener('input', () => msg.textContent = 'Unsaved changes');
+  $('button', card).onclick = async () => {
+    try { await onSave(readForm(form, obj)); msg.textContent = 'Saved ✓ (applied — stream changes reconnect the camera)'; }
+    catch (e) { msg.textContent = 'Error: ' + e.message; }
+  };
+  return card;
+}
+
+// ---------- map ----------
+const canvas = $('#map'), ctx = canvas.getContext('2d');
+let view = null;
+function resizeMap() {
+  const r = canvas.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resizeMap);
+function computeView() {
+  const r = canvas.getBoundingClientRect();
+  const xs = [-12, 12], ys = [-3, 22];
+  const s = Math.min(r.width / (xs[1] - xs[0]), r.height / (ys[1] - ys[0]));
+  const ox = r.width / 2, oy = r.height - (0 - ys[0]) * s;
+  return {s, toPx: (x, y) => [ox + x * s, oy - y * s], toWorld: (px, py) => [(px - ox) / s, (oy - py) / s], r};
+}
+canvas.onclick = e => {
+  const eyeId = $('#mapEye').value;
+  if (!view || !eyeId) return;
+  const b = canvas.getBoundingClientRect();
+  const [x, y] = view.toWorld(e.clientX - b.left, e.clientY - b.top);
+  api(`/api/eyes/${eyeId}/look_at`, {x, y, seconds: 5});
+};
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function drawMap() {
+  if (!config) return;
+  view = computeView();
+  const {s, toPx, r} = view;
+  ctx.clearRect(0, 0, r.width, r.height);
+  ctx.lineWidth = 1;
+  for (let x = -30; x <= 30; x++) for (const dir of [0, 1]) {
+    ctx.strokeStyle = css('--line'); ctx.globalAlpha = x % 5 === 0 ? 1 : 0.4;
+    ctx.beginPath();
+    if (dir) { ctx.moveTo(...toPx(x, -10)); ctx.lineTo(...toPx(x, 40)); }
+    else { ctx.moveTo(...toPx(-30, x)); ctx.lineTo(...toPx(30, x)); }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = css('--muted'); ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(...toPx(-30, 0)); ctx.lineTo(...toPx(30, 0)); ctx.stroke();
+  ctx.fillStyle = css('--muted'); ctx.font = '12px system-ui';
+  ctx.fillText('house', ...toPx(0.3, -0.7)); ctx.fillText('street ↑', ...toPx(0.3, 20));
+  for (const c of config.cameras) {
+    const [px, py] = toPx(c.position[0], c.position[1]);
+    const h = c.heading * Math.PI / 180, half = c.hfov * Math.PI / 360, R = 14 * s;
+    ctx.fillStyle = 'rgba(59,130,246,.10)'; ctx.strokeStyle = 'rgba(59,130,246,.6)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(px, py);
+    for (let a = h - half; a <= h + half + 1e-6; a += half / 20) ctx.lineTo(px + Math.sin(a) * R, py - Math.cos(a) * R);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgb(59,130,246)'; ctx.fillRect(px - 5, py - 5, 10, 10);
+    ctx.fillText(c.id, px + 8, py + 14);
+  }
+  for (const e of config.eyes) {
+    const [px, py] = toPx(e.position[0], e.position[1]);
+    const a = state?.eyes?.[e.id]?.assignment, st = state?.eyes?.[e.id];
+    const pan = a?.pan ?? st?.pan ?? 0, h = (e.heading + pan) * Math.PI / 180;
+    ctx.strokeStyle = css('--accent'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.sin(h) * 25 * s, py - Math.cos(h) * 25 * s);
+    ctx.setLineDash(a?.person || a?.override ? [] : [4, 4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = css('--accent'); ctx.beginPath(); ctx.arc(px, py, 7, 0, 7); ctx.fill();
+    ctx.fillText(e.name || e.id, px + 10, py - 8);
+  }
+  for (const p of state?.people || []) {
+    const [px, py] = toPx(p.x, p.y);
+    ctx.fillStyle = css('--bad'); ctx.beginPath(); ctx.arc(px, py, 8, 0, 7); ctx.fill();
+    ctx.fillStyle = css('--text');
+    const h = p.face_h ? ` eyes ${p.face_h.toFixed(2)} m${p.height_src === 'stereo' ? ' (stereo)' : ''}` : '';
+    ctx.fillText(`#${p.id} (${p.x.toFixed(1)}, ${p.y.toFixed(1)})${h} ${p.cams.join('+')}`, px + 11, py + 4);
+  }
+}
+
+// ---------- boot / polling ----------
+const eyeCards = {};
+async function boot() {
+  config = await api('/api/config');
+  $('#cams').innerHTML = config.cameras.length ? '' :
+    '<div class="card"><h2>No cameras configured</h2><div class="msg">Add up to two on the Cameras tab. ' +
+    'Without cameras the eyes still run (idle, wander, blink) and can be calibrated manually.</div></div>';
+  for (const c of config.cameras) {
+    const d = document.createElement('div');
+    d.className = 'card cam';
+    d.innerHTML = `<h2>${c.id} <small data-camstat></small></h2><img src="/api/cameras/${c.id}/stream.mjpg" alt="${c.id} live view">`;
+    d.dataset.cam = c.id;
+    $('#cams').appendChild(d);
+  }
+  $('#mapEye').innerHTML = config.eyes.map(e => `<option value="${e.id}">${e.name || e.id}</option>`).join('');
+  $('#eyes').innerHTML = '';
+  for (const e of config.eyes) $('#eyes').appendChild(eyeCards[e.id] = eyeCard(e));
+  $('#cameraForms').innerHTML = '';
+  for (const c of config.cameras) {
+    const card = simpleCard(c.id, c, new Set(['id']), async cam => {
+      await api(`/api/cameras/${c.id}/save`, cam); Object.assign(c, cam);
+    });
+    const del = Object.assign(document.createElement('button'), {className: 'btn', textContent: 'Remove camera'});
+    del.onclick = async () => {
+      if (!confirm(`Remove camera ${c.id}?`)) return;
+      await fetch(`/api/cameras/${c.id}`, {method: 'DELETE'});
+      location.reload();
+    };
+    $('.row', card).appendChild(del);
+    $('#cameraForms').appendChild(card);
+  }
+  const MAX_CAMERAS = 2;
+  const add = document.createElement('div');
+  add.className = 'card';
+  add.innerHTML = config.cameras.length >= MAX_CAMERAS
+    ? `<h2>Cameras</h2><div class="msg">The maximum of ${MAX_CAMERAS} cameras is configured. Remove one to add another.</div>`
+    : `<h2>Add a camera <small>${config.cameras.length} of ${MAX_CAMERAS}</small></h2>
+       <div class="field"><label>id</label><input type="text" data-new-id value="camera${config.cameras.length + 1}"></div>
+       <div class="field"><label>ip</label><input type="text" data-new-ip placeholder="192.168.4.70"></div>
+       <div class="hint">Hikvision RTSP on port 554 using the shared credentials. Set its position and heading after adding.</div>
+       <div class="row"><button class="btn primary" data-add>Add camera</button><span class="msg"></span></div>`;
+  $('[data-add]', add)?.addEventListener('click', async () => {
+    const cam = {id: $('[data-new-id]', add).value.trim(), ip: $('[data-new-ip]', add).value.trim(), ip_env: '',
+      rtsp_port: 554, channel: 101, enabled: true, position: [0, 0, 3], heading: 0, pitch: -15, roll: 0, hfov: 90};
+    try { await api('/api/cameras', cam); location.reload(); }
+    catch (e) { $('.msg', add).textContent = 'Error: ' + e.message; }
+  });
+  $('#cameraForms').appendChild(add);
+  const settings = {world: config.world, tracking: config.tracking, director: config.director, detection: config.detection};
+  $('#settings').replaceWith(Object.assign(simpleCard('Tracking settings', settings, new Set(), async s => {
+    await api('/api/settings/save', s); Object.assign(config, s);
+  }), {id: 'settings'}));
+  resizeMap();
+}
+
+// Pick up eye changes made elsewhere (e.g. the calibration page) unless the form has unsaved edits.
+async function syncEyes() {
+  try {
+    const fresh = await api('/api/config');
+    fresh.eyes.forEach((e, i) => {
+      const old = config.eyes.find(x => x.id === e.id), card = eyeCards[e.id];
+      if (old && card && !card.isDirty() && JSON.stringify(old) !== JSON.stringify(e)) {
+        config.eyes[config.eyes.indexOf(old)] = e;
+        const next = eyeCard(e);
+        card.replaceWith(next);
+        eyeCards[e.id] = next;
+      }
+    });
+  } catch (e) { /* ignore */ }
+  setTimeout(syncEyes, 3000);
+}
+
+async function poll() {
+  try {
+    state = await api('/api/state');
+    const chips = [];
+    for (const c of state.cameras) {
+      chips.push(`<span class="chip"><span class="dot ${c.connected ? 'ok' : 'bad'}"></span>${c.id} ${c.detect_fps} fps</span>`);
+      const el = document.querySelector(`[data-cam="${c.id}"] [data-camstat]`);
+      if (el) el.textContent = c.connected ? `${c.size[0]}×${c.size[1]} · read ${c.read_fps} fps · detect ${c.detect_fps} fps · ${c.people} people` : 'connecting…';
+    }
+    for (const [id, st] of Object.entries(state.eyes)) {
+      chips.push(`<span class="chip"><span class="dot ${st.online ? (st.config_in_sync ? 'ok' : 'warn') : 'bad'}"></span>${id} ${st.online ? st.state : 'offline'}</span>`);
+      eyeCards[id]?.updateStatus(st);
+    }
+    $('#chips').innerHTML = chips.join('');
+    drawMap();
+  } catch (e) { $('#chips').innerHTML = '<span class="chip"><span class="dot bad"></span>tracker unreachable</span>'; }
+  setTimeout(poll, 250);
+}
+boot().then(() => { poll(); setTimeout(syncEyes, 3000); });
+</script>
+</body>
+</html>

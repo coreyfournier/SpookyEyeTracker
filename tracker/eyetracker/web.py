@@ -1,0 +1,173 @@
+"""Configuration / calibration UI and JSON API."""
+from __future__ import annotations
+
+import asyncio
+import time
+from pathlib import Path
+
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+
+from .config import MAX_CAMERAS, ConfigError
+
+STATIC = Path(__file__).resolve().parent / "static"
+SETTINGS_SECTIONS = ("world", "tracking", "director", "detection")
+
+
+def create_app(store, world, link, director, cameras, calib) -> FastAPI:
+    """cameras is a CameraManager (it may be inactive when run with --no-cameras)."""
+    app = FastAPI(title="Animatronic Eye Tracker")
+
+    @app.exception_handler(ConfigError)
+    def config_error(_request: Request, exc: ConfigError):
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    def eye_or_404(eye_id):
+        eye = store.eye(eye_id)
+        if eye is None:
+            raise HTTPException(404, f"unknown eye {eye_id}")
+        return eye
+
+    @app.get("/")
+    def index():
+        return FileResponse(STATIC / "index.html")
+
+    @app.get("/calibrate")
+    def calibrate_page():
+        return FileResponse(STATIC / "calibrate.html")
+
+    @app.get("/api/config")
+    def get_config():
+        return store.get()
+
+    @app.get("/api/state")
+    def state():
+        cfg = store.get()
+        return {
+            "cameras": cameras.statuses(),
+            "max_cameras": MAX_CAMERAS,
+            "cameras_active": cameras.active,
+            "people": [p.to_dict(time.time()) for p in world.people()],
+            "eyes": {e["id"]: {**link.status(e), "assignment": director.assignments.get(e["id"])}
+                     for e in cfg["eyes"]},
+        }
+
+    # ---------- eyes ----------
+    @app.post("/api/eyes/{eye_id}/save_push")
+    async def save_push(eye_id: str, eye: dict = Body(...)):
+        if eye.get("id") != eye_id:
+            raise HTTPException(400, "id mismatch")
+        store.replace_item("eyes", eye, save=True)
+        pushed = await asyncio.to_thread(link.push_config, store.eye(eye_id)) if eye.get("enabled", True) else False
+        return {"saved": True, "pushed": pushed}
+
+    @app.post("/api/eyes/{eye_id}/push")
+    async def push(eye_id: str):
+        pushed = await asyncio.to_thread(link.push_config, eye_or_404(eye_id))
+        return {"pushed": pushed}
+
+    @app.post("/api/eyes/{eye_id}/manual")
+    def manual(eye_id: str, body: dict = Body(...)):
+        link.manual(eye_or_404(eye_id), pan=float(body.get("pan", 0)), tilt=float(body.get("tilt", 0)),
+                    lid=float(body.get("lid", 1)), raw=body.get("raw"), hold_s=float(body.get("hold_s", 15)))
+        return {"ok": True}
+
+    @app.post("/api/eyes/{eye_id}/release")
+    def release(eye_id: str):
+        link.release(eye_or_404(eye_id))
+        return {"ok": True}
+
+    @app.post("/api/eyes/{eye_id}/look_at")
+    def look_at(eye_id: str, body: dict = Body(...)):
+        eye_or_404(eye_id)
+        director.look_at(eye_id, float(body["x"]), float(body["y"]), float(body.get("seconds", 5)))
+        return {"ok": True}
+
+    # ---------- calibrate by pointing ----------
+    @app.get("/api/calib/{eye_id}")
+    def calib_state(eye_id: str):
+        eye = eye_or_404(eye_id)
+        servos = eye["firmware"]["servos"]
+        return {"target": calib.target_info(eye), "samples": calib.samples(eye), "fit": calib.fit(eye),
+                "current": {a: {"center": servos[a]["center"], "us_per_deg": servos[a]["us_per_deg"]}
+                            for a in ("pan", "tilt")},
+                "eye": link.status(eye)}
+
+    @app.post("/api/calib/{eye_id}/capture")
+    def calib_capture(eye_id: str, body: dict = Body(...)):
+        try:
+            calib.capture(eye_or_404(eye_id), body["pan_us"], body["tilt_us"])
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+        return {"ok": True}
+
+    @app.post("/api/calib/{eye_id}/delete")
+    def calib_delete(eye_id: str, body: dict = Body(...)):
+        calib.delete(eye_id, int(body["index"]))
+        return {"ok": True}
+
+    @app.post("/api/calib/{eye_id}/clear")
+    def calib_clear(eye_id: str):
+        calib.clear(eye_id)
+        return {"ok": True}
+
+    @app.post("/api/calib/{eye_id}/apply")
+    async def calib_apply(eye_id: str):
+        eye_or_404(eye_id)
+        try:
+            eye = calib.apply(eye_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+        pushed = await asyncio.to_thread(link.push_config, eye)
+        return {"saved": True, "pushed": pushed}
+
+    # ---------- cameras & settings ----------
+    @app.post("/api/cameras")
+    def add_camera(cam: dict = Body(...)):
+        if not cam.get("id"):
+            raise HTTPException(400, "camera id required")
+        if store.camera(cam["id"]) is not None:
+            raise HTTPException(409, f"camera {cam['id']} already exists")
+        store.replace_item("cameras", cam, save=True)   # validate() enforces MAX_CAMERAS
+        cameras.sync()
+        return {"saved": True}
+
+    @app.post("/api/cameras/{cam_id}/save")
+    def save_camera(cam_id: str, cam: dict = Body(...)):
+        if cam.get("id") != cam_id or store.camera(cam_id) is None:
+            raise HTTPException(400, "unknown camera / id mismatch")
+        store.replace_item("cameras", cam, save=True)
+        cameras.sync()
+        return {"saved": True}
+
+    @app.delete("/api/cameras/{cam_id}")
+    def delete_camera(cam_id: str):
+        if not store.remove_item("cameras", cam_id, save=True):
+            raise HTTPException(404, f"unknown camera {cam_id}")
+        cameras.sync()
+        return {"deleted": True}
+
+    @app.post("/api/settings/save")
+    def save_settings(body: dict = Body(...)):
+        data = store.get()
+        for key in SETTINGS_SECTIONS:
+            if key in body:
+                data[key] = body[key]
+        store.update(data, save=True)
+        return {"saved": True}
+
+    @app.get("/api/cameras/{cam_id}/stream.mjpg")
+    def stream(cam_id: str):
+        worker = cameras.get(cam_id)
+        if worker is None:
+            raise HTTPException(404)
+
+        def gen():
+            while not worker.stopped:
+                jpg = worker.wait_jpeg()
+                if jpg:
+                    yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpg + b"\r\n"
+
+        return StreamingResponse(gen(), media_type="multipart/x-mixed-replace; boundary=frame")
+
+    return app

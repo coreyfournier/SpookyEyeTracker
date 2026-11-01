@@ -1,0 +1,22 @@
+# Run the tracker in Docker:   docker compose up -d     ->  http://localhost:8080
+#
+# GPU (default image) needs Docker Desktop with the WSL2 backend and an NVIDIA driver on
+# Windows. No GPU? Use the CPU image:  docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
+services:
+  tracker:
+    image: ghcr.io/coreyfournier/spookyeyetracker:latest
+    build: .
+    container_name: spookyeyetracker
+    restart: unless-stopped
+    env_file: .env                 # CAMERA_USERNAME, CAMERA_PASSWORD, LEFT_TO_RIGHT_IP, ...
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./tracker-data:/config     # config.yaml + calibration.json (created on first run)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

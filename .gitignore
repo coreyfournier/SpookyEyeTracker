@@ -1,0 +1,19 @@
+# secrets
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tracker/test-results.xml
+
+# runtime data / downloaded weights
+tracker/calibration.json
+tracker-data/
+*.pt
+*.yaml.tmp
+
+# platformio
+firmware/.pio/
+firmware/.vscode/

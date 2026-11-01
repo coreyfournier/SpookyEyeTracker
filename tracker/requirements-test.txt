@@ -1,0 +1,8 @@
+# Lightweight deps for the unit tests (no torch/ultralytics/GPU needed).
+numpy>=1.26
+opencv-python-headless>=4.10
+pyyaml>=6.0
+python-dotenv>=1.0
+fastapi>=0.115
+httpx>=0.27
+pytest>=8.0
