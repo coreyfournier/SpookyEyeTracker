@@ -19,6 +19,13 @@ eyes, each driven by an ESP32.
                     ESP32 eye(s) - smoothing, blink, wander, iris colour, spooky mode
 ```
 
+<p align="center">
+  <img src="docs/images/cad-street.png" alt="The eye seen from the street through the window, with the suction cup above it" width="49%">
+  <img src="docs/images/cad-side.png" alt="Side view: the frame hangs flat against the glass from one suction cup" width="34%">
+</p>
+<p align="center"><i>The eye from the street, through the window glass (left), and from the side: the frame hangs
+flat on the inside of the glass from one suction cup (right).</i></p>
+
 Detection knows nothing about eyes, and eyes know nothing about cameras. To add an eye,
 flash another board and add an entry under `eyes:` in the config (or the UI).
 
@@ -319,6 +326,18 @@ triangulate it. `world.look_height` is used only when height can't be measured.
 
 Generate the parts with `.venv\Scripts\python cad\build.py` (needs `trimesh` and
 `manifold3d`).
+
+<p align="center">
+  <img src="docs/images/cad-inside.png" alt="Assembled eye seen from inside the house: lattice frame, servos, gimbal" width="45%">
+  <img src="docs/images/cad-frame.png" alt="The frame on its own: window plate, cup pocket and lattice walls" width="45%">
+</p>
+<p align="center"><i>From inside the house: the eye in its gimbal, the four SG90 servos (blue) and the
+lattice frame (left). The frame on its own (right).</i></p>
+
+![Every printed part, as it sits on the print bed](docs/images/cad-parts.png)
+
+These renders come from `.venv\Scripts\python cad\render.py`, which uses Playwright,
+headless Edge and three.js. Rerun it after changing the CAD.
 
 **How the eye lights up.** The whole front of the eye glows, in two zones:
 
