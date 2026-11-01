@@ -168,6 +168,11 @@ Lengths are approximate, so check against your prints.
    apply without a restart. With no cameras the eyes still idle, wander and blink, and can
    be calibrated by hand.
 3. Set each eye's `ip` (shown on its OLED - reserve it in your router's DHCP).
+4. **Units.** The **m | ft** switch in the header of every page (main UI, `/calibrate`,
+   `/camcal`) picks metres or feet for everything the UI shows and every distance you type.
+   Heights display as 5′ 9″ in feet, and height boxes accept `5'9"`, `5.75`, `69in` or `175cm`.
+   The choice is saved as `ui.units` (`metric` or `imperial`), so your phone and PC agree.
+   `config.yaml`, the API and the eye protocol always stay in metres.
 
 ## 2. Run the tracker
 
@@ -263,7 +268,7 @@ config, and with `director.auto_push` the tracker re-sends it automatically.
 tuning them by hand, open `/camcal` on your phone (**Calibrate cameras** in the main UI)
 and let the wizard walk you through it. Have the yard to yourself.
 
-1. Enter your height, and mark a **center spot** both cameras can see. Measuring how far
+1. Enter your height (in feet, `5'9"` works), and mark a **center spot** both cameras can see. Measuring how far
    it is from the window (out toward the street, and to the side) is optional but
    recommended: it ties the cameras to the eyes.
 2. Tap **Start** and pocket the phone. It reads out where to go: the center spot, left,

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
 from .config import MAX_CAMERAS, ConfigError
 from .geometry import DEFAULT_AIM
@@ -14,7 +15,7 @@ from .ota import OtaError, detect_board, ota_password, upload as ota_upload
 from .version import firmware_status, latest_firmware_version
 
 STATIC = Path(__file__).resolve().parent / "static"
-SETTINGS_SECTIONS = ("world", "tracking", "director", "detection")
+SETTINGS_SECTIONS = ("world", "tracking", "director", "detection", "ui")
 # Default identify colours, in config order: cyan, magenta, yellow, green, blue, white.
 IDENTIFY_PALETTE = ([0, 255, 255], [255, 0, 255], [255, 200, 0], [0, 255, 0], [0, 60, 255], [255, 255, 255])
 
@@ -23,6 +24,7 @@ def create_app(store, world, link, director, cameras, calib, camcal=None) -> Fas
     """cameras is a CameraManager (it may be inactive when run with --no-cameras);
     camcal is the CameraCalibration wizard."""
     app = FastAPI(title="Animatronic Eye Tracker")
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     @app.exception_handler(ConfigError)
     def config_error(_request: Request, exc: ConfigError):

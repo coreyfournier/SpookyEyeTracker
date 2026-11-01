@@ -99,3 +99,13 @@ def test_identify_colour_defaults_by_position(app, store):
     eye.pop("identify_color")
     store.replace_item("eyes", eye, save=False)
     assert app.post("/api/eyes/eye2/identify", json={"on": True}).json()["rgb"] == [255, 0, 255]   # 2nd default
+
+
+def test_units_setting_round_trips_and_is_validated(app, store):
+    assert app.get("/static/units.js").status_code == 200
+    assert app.post("/api/settings/save", json={"ui": {"units": "imperial"}}).status_code == 200
+    assert store.section("ui") == {"units": "imperial"}
+    assert store.section("world")["look_height"] == 1.55        # other sections untouched
+    r = app.post("/api/settings/save", json={"ui": {"units": "furlongs"}})
+    assert r.status_code == 400 and "ui.units" in r.json()["detail"]
+    assert store.section("ui") == {"units": "imperial"}

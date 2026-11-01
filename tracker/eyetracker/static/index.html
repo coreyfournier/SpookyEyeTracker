@@ -67,16 +67,17 @@
   </nav>
   <a href="/camcal" style="color:var(--accent)">Calibrate cameras ↗</a>
   <a href="/calibrate" style="color:var(--accent)">Calibrate by pointing ↗</a>
+  <span id="units"></span>
   <div id="chips"></div>
 </header>
 <main>
   <section class="tab active" id="tab-live">
     <div class="grid" id="cams"></div>
     <div class="card" style="margin-top:16px">
-      <h2>Yard map <small>top-down, metres · street is up · click to point</small>
+      <h2>Yard map <small>top-down, <span data-unitname>metres</span> · street is up · click to point</small>
         <select id="mapEye" title="Eye to point when clicking the map"></select></h2>
       <canvas id="map"></canvas>
-      <div class="hint">Stand somewhere you can measure (e.g. 5 m out from the eye) and compare with the dot.
+      <div class="hint">Stand somewhere you can measure (e.g. <span data-example>5 m</span> out from the eye) and compare with the dot.
         Adjust camera position/heading/pitch on the Cameras tab until the dot and the grid overlay line up, or let
         <a href="/camcal">Calibrate cameras</a> (on your phone) walk you through it and work them out.</div>
     </div>
@@ -85,6 +86,7 @@
   <section class="tab" id="tab-cameras"><div class="grid" id="cameraForms"></div></section>
   <section class="tab" id="tab-settings"><div class="card" id="settings"></div></section>
 </main>
+<script src="/static/units.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const api = async (path, body) => {
@@ -121,6 +123,15 @@ addEventListener('pagehide', () => {
 
 // ---------- generic form builder ----------
 const COLOR_KEYS = new Set(['idle', 'track', 'sleep', 'sclera', 'identify_color']);
+// Lengths (metres in the config) are shown and typed in the chosen units; see units.js.
+const LENGTH_KEYS = new Set(['position', 'look_height', 'merge_distance', 'switch_margin']);
+function lengthInput(m) {
+  const value = Units.input(m, 3);
+  const el = Object.assign(document.createElement('input'), {type: 'number', step: 'any', value});
+  el.dataset.shown = value;   // untouched fields keep their exact metric value (no rounding drift)
+  return el;
+}
+const readLength = (el, old) => el.value === el.dataset.shown ? old : +Units.fromDisplay(parseFloat(el.value)).toFixed(4);
 const toHex = c => '#' + c.map(v => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
 const fromHex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
 
@@ -138,7 +149,8 @@ function buildForm(obj, path = [], skip = new Set()) {
     }
     const row = document.createElement('div');
     row.className = 'field';
-    row.innerHTML = `<label>${k.replace(/_/g, ' ')}</label>`;
+    const isLen = LENGTH_KEYS.has(k);
+    row.innerHTML = `<label>${k.replace(/_/g, ' ')}${isLen ? ` <small>(${Units.unit})</small>` : ''}</label>`;
     let input;
     if (typeof v === 'boolean') {
       input = Object.assign(document.createElement('input'), {type: 'checkbox', checked: v});
@@ -148,8 +160,12 @@ function buildForm(obj, path = [], skip = new Set()) {
     } else if (Array.isArray(v)) {
       input = document.createElement('div');
       input.className = 'vec';
-      input.dataset.kind = 'vec';
-      v.forEach(n => input.appendChild(Object.assign(document.createElement('input'), {type: 'number', step: 'any', value: n})));
+      input.dataset.kind = isLen ? 'lenvec' : 'vec';
+      v.forEach(n => input.appendChild(isLen ? lengthInput(n)
+        : Object.assign(document.createElement('input'), {type: 'number', step: 'any', value: n})));
+    } else if (typeof v === 'number' && isLen) {
+      input = lengthInput(v);
+      input.dataset.kind = 'len';
     } else if (typeof v === 'number') {
       input = Object.assign(document.createElement('input'), {type: 'number', step: 'any', value: v});
     } else {
@@ -172,6 +188,8 @@ function readForm(root, base) {
     if (el.type === 'checkbox') o[k] = el.checked;
     else if (el.dataset.kind === 'color') o[k] = fromHex(el.value);
     else if (el.dataset.kind === 'vec') o[k] = [...el.querySelectorAll('input')].map(i => parseFloat(i.value));
+    else if (el.dataset.kind === 'lenvec') o[k] = [...el.querySelectorAll('input')].map((i, n) => readLength(i, old[n]));
+    else if (el.dataset.kind === 'len') o[k] = readLength(el, old);
     else if (typeof old === 'number') o[k] = parseFloat(el.value);
     else o[k] = el.value;
   });
@@ -382,8 +400,11 @@ function drawMap() {
   const {s, toPx, r} = view;
   ctx.clearRect(0, 0, r.width, r.height);
   ctx.lineWidth = 1;
-  for (let x = -30; x <= 30; x++) for (const dir of [0, 1]) {
-    ctx.strokeStyle = css('--line'); ctx.globalAlpha = x % 5 === 0 ? 1 : 0.4;
+  // grid: 1 m (bold every 5 m), or 5 ft (bold every 25 ft)
+  const step = Units.imperial ? 5 * 0.3048 : 1;
+  for (let i = -Math.ceil(30 / step); i <= Math.ceil(40 / step); i++) for (const dir of [0, 1]) {
+    const x = i * step;
+    ctx.strokeStyle = css('--line'); ctx.globalAlpha = i % 5 === 0 ? 1 : 0.4;
     ctx.beginPath();
     if (dir) { ctx.moveTo(...toPx(x, -10)); ctx.lineTo(...toPx(x, 40)); }
     else { ctx.moveTo(...toPx(-30, x)); ctx.lineTo(...toPx(30, x)); }
@@ -418,8 +439,8 @@ function drawMap() {
     const [px, py] = toPx(p.x, p.y);
     ctx.fillStyle = css('--bad'); ctx.beginPath(); ctx.arc(px, py, 8, 0, 7); ctx.fill();
     ctx.fillStyle = css('--text');
-    const h = p.face_h ? ` eyes ${p.face_h.toFixed(2)} m${p.height_src === 'stereo' ? ' (stereo)' : ''}` : '';
-    ctx.fillText(`#${p.id} (${p.x.toFixed(1)}, ${p.y.toFixed(1)})${h} ${p.cams.join('+')}`, px + 11, py + 4);
+    const h = p.face_h ? ` eyes ${Units.height(p.face_h)}${p.height_src === 'stereo' ? ' (stereo)' : ''}` : '';
+    ctx.fillText(`#${p.id} ${Units.xy(p.x, p.y)}${h} ${p.cams.join('+')}`, px + 11, py + 4);
   }
 }
 
@@ -427,6 +448,10 @@ function drawMap() {
 const eyeCards = {};
 async function boot() {
   config = await api('/api/config');
+  Units.fromConfig(config);
+  $('#units').replaceChildren(Units.toggle(() => boot()));   // rebuild forms in the new units
+  document.querySelectorAll('[data-unitname]').forEach(el => el.textContent = Units.imperial ? 'feet' : 'metres');
+  document.querySelectorAll('[data-example]').forEach(el => el.textContent = Units.imperial ? '15 ft' : '5 m');
   $('#cams').innerHTML = config.cameras.length ? '' :
     '<div class="card"><h2>No cameras configured</h2><div class="msg">Add up to two on the Cameras tab. ' +
     'Without cameras the eyes still run (idle, wander, blink) and can be calibrated manually.</div></div>';

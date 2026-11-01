@@ -19,6 +19,7 @@ BUNDLED_CONFIG = TRACKER_DIR / "config.default.yaml"   # committed template
 # Live config: $EYETRACKER_CONFIG (Docker: /config/config.yaml), else tracker-data/ (git-ignored).
 DEFAULT_CONFIG = Path(os.environ.get("EYETRACKER_CONFIG", PROJECT_DIR / "tracker-data" / "config.yaml"))
 MAX_CAMERAS = 2
+UNIT_SYSTEMS = ("metric", "imperial")   # display only - the config itself is always metres
 
 load_dotenv(PROJECT_DIR / ".env")
 
@@ -61,6 +62,9 @@ def validate(cfg: dict) -> list[str]:
         for key in ("ip", "position", "heading", "firmware"):
             if key not in e:
                 errors.append(f"eye {e.get('id')}: missing {key}")
+    units = (cfg.get("ui") or {}).get("units", "metric")
+    if units not in UNIT_SYSTEMS:
+        errors.append(f"ui.units must be one of {', '.join(UNIT_SYSTEMS)} (got {units!r})")
     for key in ("world", "detection", "tracking", "director", "web"):
         if key not in cfg:
             errors.append(f"missing section: {key}")

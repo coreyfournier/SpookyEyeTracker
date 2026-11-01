@@ -25,7 +25,7 @@
   .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
   .muted { color: var(--muted); font-size: 14px; }
   label { display: block; margin: 10px 0 4px; font-size: 14px; }
-  input[type=number] { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+  input[type=number], input[type=text] { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
     background: var(--bg); color: var(--text); }
   .check { display: flex; gap: 8px; align-items: center; margin: 12px 0 4px; font-size: 15px; }
   .check input { width: 20px; height: 20px; }
@@ -65,6 +65,7 @@
 <main>
   <header>
     <h1>📷 Calibrate cameras</h1>
+    <span id="units"></span>
     <a href="/calibrate">Eye aim</a>
     <a href="/">Main UI</a>
   </header>
@@ -81,8 +82,8 @@
     </div>
     <div class="card">
       <h2>1 · Your height</h2>
-      <label for="height">Height without shoes, metres</label>
-      <input type="number" id="height" step="0.01" min="1" max="2.3" inputmode="decimal" value="1.75">
+      <label for="height">Height without shoes, <span data-unit-word>metres</span></label>
+      <input type="text" id="height" autocomplete="off" data-len>
       <div class="muted" id="eyeLevel" style="margin-top:4px"></div>
     </div>
     <div class="card">
@@ -91,10 +92,10 @@
         a shoe). You'll start there.</div>
       <label class="check"><input type="checkbox" id="measured" checked> I measured where it is (recommended)</label>
       <div id="anchorFields">
-        <label for="out">Metres out from <span class="eyeName">the eye</span>, toward the street</label>
-        <input type="number" id="out" step="0.1" inputmode="decimal" value="6">
-        <label for="side">Metres to the side: + right, − left (standing at the window, facing the street)</label>
-        <input type="number" id="side" step="0.1" inputmode="decimal" value="0">
+        <label for="out"><span data-unit-cap>Metres</span> out from <span class="eyeName">the eye</span>, toward the street</label>
+        <input type="text" id="out" inputmode="decimal" autocomplete="off" data-len>
+        <label for="side"><span data-unit-cap>Metres</span> to the side: + right, − left (standing at the window, facing the street)</label>
+        <input type="text" id="side" inputmode="decimal" autocomplete="off" data-len>
         <div class="muted" style="margin-top:6px">This ties the cameras to the eyes. Without it the cameras will still
           agree with each other, but the whole picture can be shifted a little.</div>
       </div>
@@ -168,6 +169,7 @@
   </section>
 </main>
 <div id="toast"></div>
+<script src="/static/units.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const api = async (path, body) => {
@@ -209,24 +211,41 @@ async function keepAwake(on) {
 
 // ---------- setup ----------
 const eye1 = () => cfg.eyes[0] || {position: [0, 0, 0], name: 'the eye'};
+// Lengths are typed in the chosen units (5'9" works too) and remembered in metres.
+const DEFAULTS = {height: 1.75, out: 6, side: 0};
+const lengthOf = id => Units.parse($('#' + id).value);
 function updateEyeLevel() {
-  const h = parseFloat($('#height').value);
-  $('#eyeLevel').textContent = h > 0 ? `Your eyes are about ${(h - 0.11).toFixed(2)} m off the ground.` : '';
+  const h = lengthOf('height');
+  $('#eyeLevel').textContent = h > 1 && h < 2.3 ? `Your eyes are about ${Units.height(h - 0.11)} off the ground.`
+    : $('#height').value.trim() ? (Units.imperial ? `Type your height like 5'9" or 5.75` : 'Type your height like 1.75') : '';
 }
-['height', 'out', 'side'].forEach(id => {
-  $('#' + id).value = store.get('camcal.' + id, $('#' + id).value);
-  $('#' + id).oninput = () => { store.set('camcal.' + id, $('#' + id).value); updateEyeLevel(); };
+function showLengths() {
+  for (const id of Object.keys(DEFAULTS)) {
+    const m = parseFloat(store.get('camcal.m.' + id, DEFAULTS[id]));
+    $('#' + id).value = id === 'height' && Units.imperial ? Units.height(m).replace(/\s/g, '') : Units.input(m, 1);
+  }
+  document.querySelectorAll('[data-unit-word]').forEach(el => el.textContent = Units.imperial ? 'feet' : 'metres');
+  document.querySelectorAll('[data-unit-cap]').forEach(el => el.textContent = Units.imperial ? 'Feet' : 'Metres');
+  $('#height').placeholder = Units.imperial ? `5'9"` : '1.75';
+  updateEyeLevel();
+}
+Object.keys(DEFAULTS).forEach(id => $('#' + id).oninput = () => {
+  const m = lengthOf(id);
+  if (Number.isFinite(m)) store.set('camcal.m.' + id, m);
+  updateEyeLevel();
 });
 $('#measured').onchange = () => $('#anchorFields').hidden = !$('#measured').checked;
 $('#speak').checked = store.get('camcal.speak', '1') === '1';
 $('#speak').onchange = () => store.set('camcal.speak', $('#speak').checked ? '1' : '0');
 
 $('#start').onclick = async () => {
-  const height = parseFloat($('#height').value);
+  const height = lengthOf('height');
+  if (!(height > 1 && height < 2.3)) return toast(Units.imperial ? `Enter your height, e.g. 5'9"` : 'Enter your height, e.g. 1.75');
   let anchor = null;
   if ($('#measured').checked) {
-    const [ex, ey] = eye1().position;
-    anchor = [ex + parseFloat($('#side').value || 0), ey + parseFloat($('#out').value || 0)];
+    const [ex, ey] = eye1().position, side = lengthOf('side') || 0, out = lengthOf('out');
+    if (!Number.isFinite(out)) return toast('Enter how far out the center spot is');
+    anchor = [ex + side, ey + out];
   }
   say('Starting.');   // speech and audio must start from a tap on phones
   beep(660, 60);
@@ -320,12 +339,12 @@ function render() {
   announce();
 }
 
-function fmt(v, unit) { return v == null ? '—' : `${v.toFixed(2)} ${unit}`; }
+function fmt(v) { return v == null ? '—' : Units.len(v, 2); }
 function renderResult(r) {
   const b = r.before, a = r.after;
   $('#quality').innerHTML = `<tr><th></th><th>before</th><th>after</th></tr>
-    <tr><td>Cameras disagree by</td><td>${fmt(b.camera_gap_m, 'm')}</td><td><b>${fmt(a.camera_gap_m, 'm')}</b></td></tr>
-    <tr><td>Your eye height off by</td><td>${fmt(b.height_err_m, 'm')}</td><td><b>${fmt(a.height_err_m, 'm')}</b></td></tr>
+    <tr><td>Cameras disagree by</td><td>${fmt(b.camera_gap_m)}</td><td><b>${fmt(a.camera_gap_m)}</b></td></tr>
+    <tr><td>Your eye height off by</td><td>${fmt(b.height_err_m)}</td><td><b>${fmt(a.height_err_m)}</b></td></tr>
     <tr><td>Fit error</td><td></td><td><b>${r.rms_deg.toFixed(2)}°</b></td></tr>`;
   const good = r.rms_deg < 1.5 && (a.camera_gap_m == null || a.camera_gap_m < 0.5);
   $('#verdict').innerHTML = good
@@ -340,8 +359,8 @@ function renderResult(r) {
   $('#changes').innerHTML = r.cameras.map(c => {
     const o = old[c.id] || c;
     return `<tr><th>${c.id}</th><th>before</th><th>after</th></tr>
-      <tr><td>position</td><td>${o.position.map(v => v.toFixed(1)).join(', ')}</td>
-        <td><b>${c.position.map(v => v.toFixed(1)).join(', ')}</b></td></tr>
+      <tr><td>position (${Units.unit})</td><td>${o.position.map(v => Units.toDisplay(v).toFixed(1)).join(', ')}</td>
+        <td><b>${c.position.map(v => Units.toDisplay(v).toFixed(1)).join(', ')}</b></td></tr>
       ${row('heading', o.heading, c.heading)}${row('pitch', o.pitch, c.pitch)}
       ${row('roll', o.roll || 0, c.roll)}${row('field of view', o.hfov, c.hfov)}`;
   }).join('');
@@ -386,6 +405,10 @@ async function poll() {
 
 (async () => {
   cfg = await api('/api/config');
+  Units.fromConfig(cfg);
+  // switching units re-reads the step text too (the tracker words distances in the new units)
+  $('#units').replaceWith(Units.toggle(async () => { showLengths(); lastSpoken.key = null; await poll(); }));
+  showLengths();
   document.querySelectorAll('.eyeName').forEach(el => el.textContent = eye1().name || eye1().id);
   updateEyeLevel();
   $('#anchorFields').hidden = !$('#measured').checked;

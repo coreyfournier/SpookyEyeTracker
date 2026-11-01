@@ -230,3 +230,11 @@ def test_api_start_with_a_running_camera(app):
     assert r.json()["phase"] == "running" and r.json()["anchor"] == [0, 6]
     assert r.json()["eye_height"] == pytest.approx(1.75 - EYE_BELOW_TOP)
     assert app.post("/api/camcal/start", json={"height": 175}).status_code == 400
+
+
+def test_step_distances_follow_the_ui_units(wizard, store):
+    wizard.start(1.7)
+    wizard.skip()   # to "left"
+    assert "3 metres" in wizard.status()["step"]["text"]
+    store.update({**store.get(), "ui": {"units": "imperial"}}, save=False)
+    assert "10 feet" in wizard.status()["step"]["text"]

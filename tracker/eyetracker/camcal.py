@@ -29,18 +29,20 @@ log = logging.getLogger(__name__)
 STATE_NAME = "camera_calibration.json"   # stored next to config.yaml
 EYE_BELOW_TOP = 0.11                     # m from the top of the head down to the eyes
 
-# (key, title, what to tell the person)
+# (key, title, what to tell the person); {short}/{long}/{near} are distances in the UI's units
 STEPS = [
     ("center", "Center spot", "Stand on the center spot, face the house, arms by your sides, and stand still."),
-    ("left", "Left", "Walk about 3 metres to your left, keep facing the house, and stand still."),
-    ("right", "Right", "Now walk about 6 metres to your right, past the center spot, and stand still."),
-    ("street", "Toward the street", "Go back to the center, then walk about 3 metres toward the street. Stand still."),
-    ("house", "Toward the house", "Walk to a spot about 2 metres in front of the center spot, toward the house. "
+    ("left", "Left", "Walk about {short} to your left, keep facing the house, and stand still."),
+    ("right", "Right", "Now walk about {long} to your right, past the center spot, and stand still."),
+    ("street", "Toward the street", "Go back to the center, then walk about {short} toward the street. Stand still."),
+    ("house", "Toward the house", "Walk to a spot about {near} in front of the center spot, toward the house. "
                                   "Stand still."),
     ("pick", "Your pick", "Last one: pick a spot you haven't stood on, somewhere people usually walk past. "
                           "Stand still."),
 ]
 EXTRA_STEP = ("extra", "Extra spot", "Walk to a new spot both cameras can see and stand still.")
+STEP_DISTANCES = {"metric": {"short": "3 metres", "long": "6 metres", "near": "2 metres"},
+                  "imperial": {"short": "10 feet", "long": "20 feet", "near": "7 feet"}}
 
 SEEN_WINDOW = 0.6      # s - a camera "sees you" if it had exactly one person this recently
 STILL_WINDOW = 1.2     # s of steady sightings needed before recording starts
@@ -469,6 +471,8 @@ class CameraCalibration:
         now = time.time() if now is None else now
         with self._lock:
             key, title, text = self.steps[self.index]
+            units = (self.store.section("ui") or {}).get("units", "metric")
+            text = text.format(**STEP_DISTANCES.get(units, STEP_DISTANCES["metric"]))
             seeing = self._seeing(now) if self.phase == "running" else []
             cams = [c["id"] for c in self.store.section("cameras") or [] if c.get("enabled", True)]
             progress = min(1.0, (now - self.rec_start) / RECORD_S) if self.sub == "record" else 0.0

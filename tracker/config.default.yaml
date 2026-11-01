@@ -11,6 +11,9 @@
 # Pitch is degrees: negative = looking down.
 # Positions below are a FIRST GUESS - calibrate with the UI.
 
+ui:
+  units: metric          # metric or imperial: how the UI shows and takes distances (this file stays metres)
+
 world:
   look_height: 1.55      # default eye-level height when a person's height can't be measured
 
