@@ -37,7 +37,13 @@
   fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 6px 10px 10px; }
   legend { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; }
   .field { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .field { flex-wrap: wrap; }
   .field label { min-width: 110px; color: var(--muted); }
+  .info { border: 1px solid var(--line); background: none; color: var(--muted); border-radius: 50%; width: 18px; height: 18px;
+    padding: 0; font: 600 11px/16px system-ui; cursor: pointer; margin-left: 4px; vertical-align: middle; text-transform: none; }
+  .info[aria-expanded=true] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .help { flex-basis: 100%; color: var(--text); background: var(--bg); border-left: 3px solid var(--accent); border-radius: 4px;
+    padding: 6px 10px; margin: 2px 0 6px; font-size: 13px; line-height: 1.45; text-transform: none; letter-spacing: 0; }
   input[type=number], input[type=text], select { background: var(--bg); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 4px 6px; font: inherit; width: 90px; }
   input[type=text] { width: 180px; }
@@ -87,6 +93,7 @@
   <section class="tab" id="tab-settings"><div class="card" id="settings"></div></section>
 </main>
 <script src="/static/units.js"></script>
+<script src="/static/help.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const api = async (path, body) => {
@@ -126,7 +133,7 @@ const COLOR_KEYS = new Set(['idle', 'track', 'sleep', 'sclera', 'identify_color'
 // Lengths (metres in the config) are shown and typed in the chosen units; see units.js.
 const LENGTH_KEYS = new Set(['position', 'look_height', 'merge_distance', 'switch_margin']);
 function lengthInput(m) {
-  const value = Units.input(m, 3);
+  const value = Units.input(m, Units.imperial ? 2 : 3);
   const el = Object.assign(document.createElement('input'), {type: 'number', step: 'any', value});
   el.dataset.shown = value;   // untouched fields keep their exact metric value (no rounding drift)
   return el;
@@ -135,7 +142,26 @@ const readLength = (el, old) => el.value === el.dataset.shown ? old : +Units.fro
 const toHex = c => '#' + c.map(v => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
 const fromHex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
 
-function buildForm(obj, path = [], skip = new Set()) {
+// ⓘ button that shows/hides a help box (appended to `box`) for "<scope>:<path>", if there's help for it.
+function helpFor(scope, id) {
+  const text = scope && FIELD_HELP(m => Units.len(m))[`${scope}:${id.replace(/^\d+\./, '')}`];
+  return text && text.replace(/\s+/g, ' ');
+}
+function infoButton(text, box) {
+  const b = Object.assign(document.createElement('button'), {type: 'button', className: 'info', textContent: 'i',
+    title: 'What is this?'});
+  b.setAttribute('aria-expanded', 'false');
+  const help = Object.assign(document.createElement('div'), {className: 'help', textContent: text, hidden: true});
+  b.onclick = e => {
+    e.preventDefault();
+    help.hidden = !help.hidden;
+    b.setAttribute('aria-expanded', String(!help.hidden));
+  };
+  box.appendChild(help);
+  return b;
+}
+
+function buildForm(obj, path = [], skip = new Set(), scope = '') {
   const frag = document.createDocumentFragment();
   for (const [k, v] of Object.entries(obj)) {
     if (skip.has(k)) continue;
@@ -143,7 +169,14 @@ function buildForm(obj, path = [], skip = new Set()) {
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const fs = document.createElement('fieldset');
       fs.innerHTML = `<legend>${k.replace(/_/g, ' ')}</legend>`;
-      fs.appendChild(buildForm(v, p));
+      const text = helpFor(scope, id);
+      if (text) {
+        const box = document.createElement('div');
+        box.style.display = 'flex';
+        $('legend', fs).appendChild(infoButton(text, box));
+        fs.appendChild(box);
+      }
+      fs.appendChild(buildForm(v, p, new Set(), scope));
       frag.appendChild(fs);
       continue;
     }
@@ -173,6 +206,8 @@ function buildForm(obj, path = [], skip = new Set()) {
     }
     input.dataset.path = id;
     row.appendChild(input);
+    const text = helpFor(scope, id);
+    if (text) $('label', row).appendChild(infoButton(text, row));
     frag.appendChild(row);
   }
   return frag;
@@ -237,7 +272,7 @@ function eyeCard(eye) {
       <span class="msg" data-msg></span>
     </div>`;
   const form = $('[data-form]', card);
-  form.appendChild(buildForm(eye, [], new Set(['id'])));
+  form.appendChild(buildForm(eye, [], new Set(['id']), 'eye'));
   const msg = $('[data-msg]', card);
   let dirty = false;
   form.addEventListener('input', () => { dirty = true; msg.textContent = 'Unsaved changes'; });
@@ -355,15 +390,15 @@ function fwInfo(st) {
 }
 
 // ---------- cameras & settings ----------
-function simpleCard(title, obj, skip, onSave) {
+function simpleCard(title, obj, skip, onSave, scope = '') {
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `<h2>${title}</h2><div data-form></div><div class="row"><button class="btn primary">Save</button><span class="msg"></span></div>`;
   const form = $('[data-form]', card);
-  form.appendChild(buildForm(obj, [], skip));
+  form.appendChild(buildForm(obj, [], skip, scope));
   const msg = $('.msg', card);
   form.addEventListener('input', () => msg.textContent = 'Unsaved changes');
-  $('button', card).onclick = async () => {
+  $('.row button.primary', card).onclick = async () => {
     try { await onSave(readForm(form, obj)); msg.textContent = 'Saved ✓ (applied — stream changes reconnect the camera)'; }
     catch (e) { msg.textContent = 'Error: ' + e.message; }
   };
@@ -469,7 +504,7 @@ async function boot() {
   for (const c of config.cameras) {
     const card = simpleCard(c.id, c, new Set(['id']), async cam => {
       await api(`/api/cameras/${c.id}/save`, cam); Object.assign(c, cam);
-    });
+    }, 'camera');
     const del = Object.assign(document.createElement('button'), {className: 'btn', textContent: 'Remove camera'});
     del.onclick = async () => {
       if (!confirm(`Remove camera ${c.id}?`)) return;
@@ -499,7 +534,7 @@ async function boot() {
   const settings = {world: config.world, tracking: config.tracking, director: config.director, detection: config.detection};
   $('#settings').replaceWith(Object.assign(simpleCard('Tracking settings', settings, new Set(), async s => {
     await api('/api/settings/save', s); Object.assign(config, s);
-  }), {id: 'settings'}));
+  }, 'settings'), {id: 'settings'}));
   resizeMap();
 }
 
