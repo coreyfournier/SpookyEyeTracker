@@ -55,7 +55,7 @@ approximate, so check against your prints. Electronics are listed in
 | 1 | 3 mm dowel pin or M3 bolt, ~20 mm | Pan pivot through the stalk and yoke hub |
 | 2 | M3 × 25-30 mm screws | Stalk (16 mm thick) to the frame pedestal (self-tapping into the printed holes) |
 | 2 | M3 × 12 mm screws | Eyelid pivots: through each frame upright (self-tapping) into the lid's pivot hole |
-| 2 | M2 × 6 mm screws | LED jewel to the LED insert |
+| 2 | M2 / #2 × 6 mm (1/4") coarse-thread self-tapping screws for plastic (ST2.2, pan head) | LED jewel to the LED insert (1.6 mm pilot holes) |
 | 4 | ~1.5 mm steel wire pushrods (or servo linkage kit) | Servo horns to the eye/lid tabs (2.2 mm holes). Z-bend the ends |
 | 4 | M4 screws | Optional: screw the frame down to a shelf instead of hanging it |
 
