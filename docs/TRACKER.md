@@ -108,6 +108,11 @@ Then browse to `http://<PC IP>:8080` (or `/calibrate`, `/camcal`).
 These screenshots are from the real system on Halloween night, before calibration (the
 camera positions are still the first guesses).
 
+Every card's settings are grouped into sections that open one at a time. The address bar
+follows you: it names the tab, card and open section (for example `#eyes/eye1/iris`), so a
+refresh or a shared link lands in the same place. Number fields show their allowed range,
+and Save refuses values outside it.
+
 ### Live: each camera finds people
 
 ![Both camera views with a detected person](images/live-cameras.jpg)
@@ -158,6 +163,8 @@ The **Eyes** tab has one card per eye:
   - It turns off when you toggle it off, close the page, or after 60 s without the UI.
 - **Manual-control sliders:** take over the servos to find their positions (see
   [servo mechanics](#servo-mechanics-once-per-build)).
+- **Colours & brightness** save and push as you change them, so you can tune the colours
+  while watching the eye. Other sections wait for Save & Push.
 - **Save & Push:** writes the config file and sends the settings to the ESP32 over UDP.
 - **Push:** re-sends the saved settings if the eye missed them.
 - **Update firmware…:** uploads a new `firmware.bin` over WiFi (see

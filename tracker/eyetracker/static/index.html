@@ -20,8 +20,8 @@
   header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line);
            background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
   header h1 { font-size: 16px; margin: 0; }
-  nav button { background: none; border: 0; color: var(--muted); padding: 6px 10px; cursor: pointer; font: inherit; border-radius: 6px; }
-  nav button.active { color: var(--text); background: var(--bg); font-weight: 600; }
+  nav a { color: var(--muted); padding: 6px 10px; text-decoration: none; border-radius: 6px; }
+  nav a.active { color: var(--text); background: var(--bg); font-weight: 600; }
   #chips { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
   .chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; background: var(--muted); }
@@ -35,6 +35,20 @@
   .cam img { width: 100%; border-radius: 6px; background: #000; aspect-ratio: 16/9; object-fit: contain; display: block; }
   #map { width: 100%; height: 520px; border-radius: 6px; background: var(--map); cursor: crosshair; display: block; }
   fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 6px 10px 10px; }
+  /* accordion sections: one open per card */
+  details.sec { border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; scroll-margin-top: 80px; }
+  details.sec > summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; list-style: none;
+    font-weight: 600; user-select: none; border-radius: 8px; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary::before { content: '›'; color: var(--muted); font-size: 18px; line-height: 1; width: 10px;
+    transition: transform .15s; }
+  details.sec[open] > summary::before { transform: rotate(90deg); }
+  details.sec > summary:hover { background: var(--bg); }
+  details.sec[open] > summary { border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; }
+  details.sec > .body { padding: 4px 10px 10px; }
+  details.sec .peek { margin-left: auto; display: flex; gap: 4px; align-items: center; color: var(--muted);
+    font-weight: 400; font-size: 12px; }
+  .peek .sw { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
   legend { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; }
   .field { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
   .field { flex-wrap: wrap; }
@@ -67,10 +81,10 @@
 <header>
   <h1>👁 Eye Tracker</h1>
   <nav>
-    <button data-tab="live" class="active">Live</button>
-    <button data-tab="eyes">Eyes</button>
-    <button data-tab="cameras">Cameras</button>
-    <button data-tab="settings">Settings</button>
+    <a href="#live" data-tab="live" class="active">Live</a>
+    <a href="#eyes" data-tab="eyes">Eyes</a>
+    <a href="#cameras" data-tab="cameras">Cameras</a>
+    <a href="#settings" data-tab="settings">Settings</a>
   </nav>
   <a href="/camcal" style="color:var(--accent)">Calibrate cameras ↗</a>
   <a href="/calibrate" style="color:var(--accent)">Calibrate by pointing ↗</a>
@@ -105,12 +119,52 @@ const api = async (path, body) => {
 };
 let config = null, state = null;
 
-// ---------- tabs ----------
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
-  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + b.dataset.tab));
-  if (b.dataset.tab === 'live') resizeMap();
-});
+// ---------- tabs and the URL ----------
+// The URL hash says where you are, so a refresh or a shared link lands in the same place:
+// #<tab>, #<tab>/<card>/<section> (e.g. #eyes/eye1/iris), or #settings/<section>.
+const TABS = ['live', 'eyes', 'cameras', 'settings'];
+let route = {tab: 'live', owner: '', section: ''};
+function parseHash() {
+  const parts = location.hash.slice(1).split('/').map(decodeURIComponent);
+  const tab = TABS.includes(parts[0]) ? parts[0] : 'live';
+  return tab === 'settings' ? {tab, owner: 'settings', section: parts[1] || ''}
+    : {tab, owner: parts[1] || '', section: parts[2] || ''};
+}
+function routeHash(r) {
+  const parts = r.tab === 'settings' ? [r.tab, r.section] : [r.tab, r.owner, r.owner && r.section];
+  return '#' + parts.filter(Boolean).map(encodeURIComponent).join('/');
+}
+function showTab(tab) {
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
+  if (tab === 'live') resizeMap();
+}
+// Show the routed tab; open the routed section (or card) and scroll to it.
+function applyRoute() {
+  route = parseHash();
+  showTab(route.tab);
+  const tab = $('#tab-' + route.tab);
+  const target = route.section && tab.querySelector(
+    `details.sec[data-owner="${CSS.escape(route.owner)}"][data-section="${CSS.escape(route.section)}"]`);
+  if (target) { target.open = true; target.scrollIntoView({block: 'start'}); }
+  else if (route.owner) tab.querySelector(`[data-card="${CSS.escape(route.owner)}"]`)?.scrollIntoView({block: 'start'});
+}
+addEventListener('hashchange', applyRoute);
+// Opening/closing a section updates the URL in place (no extra history entries).
+const openSections = new Set();   // "<owner>/<section>" currently open; kept when cards are rebuilt
+function trackSection(d, owner, key) {
+  d.dataset.owner = owner;
+  d.dataset.section = key;
+  let restoring = d.open = openSections.has(`${owner}/${key}`);   // reopened by a rebuild: not a user action
+  d.addEventListener('toggle', () => {
+    openSections[d.open ? 'add' : 'delete'](`${owner}/${key}`);
+    if (restoring) { restoring = false; return; }
+    if (d.open) route = {tab: route.tab, owner, section: key};
+    else if (route.owner === owner && route.section === key) route = {...route, section: ''};
+    else return;
+    history.replaceState(null, '', routeHash(route));
+  });
+}
 
 // ---------- identify: light one eye in a single colour so you can find it ----------
 const identify = {};   // eye id -> {on, rgb, timer}
@@ -174,7 +228,9 @@ function infoButton(text, box) {
   b.setAttribute('aria-expanded', 'false');
   const help = Object.assign(document.createElement('div'), {className: 'help', textContent: text, hidden: true});
   b.onclick = e => {
-    e.preventDefault();
+    e.preventDefault();   // in a section header, don't also toggle the section...
+    const d = b.closest('details');
+    if (d && !d.open) d.open = true;   // ...but open it, so the help is visible
     help.hidden = !help.hidden;
     b.setAttribute('aria-expanded', String(!help.hidden));
   };
@@ -236,6 +292,67 @@ function buildForm(obj, path = [], skip = new Set(), scope = '') {
   return frag;
 }
 
+// ---------- accordion sections ----------
+// A card's form is split into collapsible sections, one open at a time: the top-level loose
+// fields ("general", or a named group of them), then one section per settings object. Objects in
+// FLATTEN are unwrapped so their children become sections (firmware.behaviors.iris -> "Colours").
+const FLATTEN = new Set(['firmware', 'firmware.behaviors']);
+const GROUPS = {
+  eye: {placement: ['position', 'heading', 'pitch']},
+  camera: {connection: ['ip', 'ip_env', 'rtsp_port', 'channel', 'enabled'], placement: ['position', 'heading', 'pitch', 'roll', 'hfov']},
+};
+const SECTION_TITLES = {
+  general: 'General', connection: 'Connection', placement: 'Position & direction', aim: 'Aim correction',
+  servos: 'Servos', motion: 'Motion', blink: 'Blinking', wander: 'Wandering (idle glances)', iris: 'Colours & brightness',
+  spooky: 'Spooky mode', sleep: 'Sleep', lids: 'Eyelids', manual: 'Servo setup (manual control)',
+  world: 'Yard', tracking: 'Tracking people', director: 'Choosing who to look at', detection: 'Person detection',
+};
+
+function section(key, owner, scope, path, group = owner) {
+  const d = document.createElement('details');
+  d.className = 'sec';
+  d.name = 'sec-' + group;   // exclusive: opening one closes the others in its group (the card's form)
+  d.innerHTML = `<summary><span>${SECTION_TITLES[key] || key.replace(/_/g, ' ')}</span><span class="peek"></span></summary>
+    <div class="body"></div>`;
+  const body = $('.body', d), text = path && helpFor(scope, path);
+  if (text) $('summary span', d).after(infoButton(text, body));
+  trackSection(d, owner, key);
+  return d;
+}
+
+// Summary preview of a section: its colours and whether it's switched on.
+function peek(d) {
+  const sw = [...d.querySelectorAll('.body input[type=color]')]
+    .map(i => `<span class="sw" style="background:${i.value}"></span>`).join('');
+  const en = [...d.querySelectorAll('.body input[type=checkbox]')].find(i => /(^|\.)enabled$/.test(i.dataset.path));
+  $('.peek', d).innerHTML = sw + (en ? (en.checked ? 'on' : 'off') : '');
+}
+
+function buildSections(obj, skip, scope, owner) {
+  const frag = document.createDocumentFragment(), groups = GROUPS[scope] || {}, loose = {}, objs = [];
+  const walk = (o, path) => {
+    for (const [k, v] of Object.entries(o)) {
+      if (!path.length && skip.has(k)) continue;
+      const p = [...path, k], id = p.join('.');
+      if (v && typeof v === 'object' && !Array.isArray(v)) FLATTEN.has(id) ? walk(v, p) : objs.push([k, p, v]);
+      else {
+        const g = Object.keys(groups).find(g => groups[g].includes(id)) || 'general';
+        (loose[g] ||= {})[k] = v;
+      }
+    }
+  };
+  walk(obj, []);
+  const secs = ['general', ...Object.keys(groups)].filter(g => loose[g]).map(g => [g, [], loose[g]]).concat(objs);
+  for (const [key, path, value] of secs) {
+    const d = section(key, owner, scope, path.join('.'));
+    $('.body', d).appendChild(buildForm(value, path, new Set(), scope));
+    peek(d);
+    d.addEventListener('input', () => peek(d));
+    frag.appendChild(d);
+  }
+  return frag;
+}
+
 function readForm(root, base) {
   const out = structuredClone(base);
   root.querySelectorAll('[data-path]').forEach(el => {
@@ -278,14 +395,7 @@ function eyeCard(eye) {
       <button class="btn" data-ident title="Light this eye in one colour, centred and still, so you can see which one it is">Identify</button></h2>
     <div class="two">
       <div data-form></div>
-      <div>
-        <fieldset><legend>Calibration (manual control)</legend>
-          <div class="hint">Moving a slider takes over the eye for 15 s. Use raw µs to find each servo's centre / open / closed
-            positions, then press the button to copy it into the form. Save &amp; Push when done.</div>
-          <div data-sliders></div>
-          <div class="row"><button class="btn" data-center>Centre</button><button class="btn" data-release>Release to tracking</button></div>
-        </fieldset>
-      </div>
+      <div data-manual></div>
     </div>
     <div class="row">
       <button class="btn primary" data-savepush>Save &amp; Push</button>
@@ -294,11 +404,38 @@ function eyeCard(eye) {
       <input type="file" accept=".bin" data-fwfile hidden>
       <span class="msg" data-msg></span>
     </div>`;
+  card.dataset.card = eye.id;
   const form = $('[data-form]', card);
-  form.appendChild(buildForm(eye, [], new Set(['id']), 'eye'));
+  form.appendChild(buildSections(eye, new Set(['id']), 'eye', eye.id));
+  const manual = section('manual', eye.id, 'eye', '', eye.id + '-manual');   // own group: stays open beside the form
+  $('.body', manual).innerHTML = `
+    <div class="hint">Moving a slider takes over the eye for 15 s. Use raw µs to find each servo's centre / open / closed
+      positions, then press the button to copy it into the form. Save &amp; Push when done.</div>
+    <div data-sliders></div>
+    <div class="row"><button class="btn" data-center>Centre</button><button class="btn" data-release>Release to tracking</button></div>`;
+  $('[data-manual]', card).appendChild(manual);
   const msg = $('[data-msg]', card);
   let dirty = false;
-  form.addEventListener('input', () => { dirty = true; msg.textContent = 'Unsaved changes'; });
+  // Colours & brightness save and push as you change them, so the eye shows them live. Only that
+  // section is sent; other unsaved edits on the card stay unsaved.
+  const colours = $('details[data-section="iris"]', form);
+  let colourSave = Promise.resolve();
+  const saveColours = throttle(() => colourSave = colourSave.then(async () => {
+    try {
+      const updated = readForm(colours, eye);
+      const r = await api(`/api/eyes/${eye.id}/save_push`, updated);
+      eye.firmware.behaviors.iris = updated.firmware.behaviors.iris;
+      msg.textContent = r.pushed ? 'Colours saved and pushed ✓' : 'Colours saved, but the eye did not acknowledge — check it is online';
+    } catch (e) { msg.textContent = 'Error: ' + e.message; }
+  }), 300);
+  if (colours) $('.body', colours).insertAdjacentHTML('afterbegin',
+    '<div class="hint">Changes here are saved and sent to the eye straight away.</div>');
+  form.addEventListener('input', e => {
+    if (!colours?.contains(e.target)) { dirty = true; msg.textContent = 'Unsaved changes'; }
+    else if (e.target.type !== 'number') saveColours();   // colour pickers: live while dragging
+  });
+  // typed numbers (brightness) go once you finish typing, not at every keystroke
+  form.addEventListener('change', e => { if (colours?.contains(e.target) && e.target.type === 'number') saveColours(); });
 
   // manual sliders
   const sliders = $('[data-sliders]', card);
@@ -413,12 +550,13 @@ function fwInfo(st) {
 }
 
 // ---------- cameras & settings ----------
-function simpleCard(title, obj, skip, onSave, scope = '') {
+function simpleCard(title, obj, skip, onSave, scope, owner) {
   const card = document.createElement('div');
   card.className = 'card';
+  card.dataset.card = owner;
   card.innerHTML = `<h2>${title}</h2><div data-form></div><div class="row"><button class="btn primary">Save</button><span class="msg"></span></div>`;
   const form = $('[data-form]', card);
-  form.appendChild(buildForm(obj, [], skip, scope));
+  form.appendChild(buildSections(obj, skip, scope, owner));
   const msg = $('.msg', card);
   form.addEventListener('input', () => msg.textContent = 'Unsaved changes');
   $('.row button.primary', card).onclick = async () => {
@@ -527,7 +665,7 @@ async function boot() {
   for (const c of config.cameras) {
     const card = simpleCard(c.id, c, new Set(['id']), async cam => {
       await api(`/api/cameras/${c.id}/save`, cam); Object.assign(c, cam);
-    }, 'camera');
+    }, 'camera', c.id);
     const del = Object.assign(document.createElement('button'), {className: 'btn', textContent: 'Remove camera'});
     del.onclick = async () => {
       if (!confirm(`Remove camera ${c.id}?`)) return;
@@ -557,7 +695,7 @@ async function boot() {
   const settings = {world: config.world, tracking: config.tracking, director: config.director, detection: config.detection};
   $('#settings').replaceWith(Object.assign(simpleCard('Tracking settings', settings, new Set(), async s => {
     await api('/api/settings/save', s); Object.assign(config, s);
-  }, 'settings'), {id: 'settings'}));
+  }, 'settings', 'settings'), {id: 'settings'}));
   resizeMap();
 }
 
@@ -597,7 +735,8 @@ async function poll() {
   } catch (e) { $('#chips').innerHTML = '<span class="chip"><span class="dot bad"></span>tracker unreachable</span>'; }
   setTimeout(poll, 250);
 }
-boot().then(() => { poll(); setTimeout(syncEyes, 3000); });
+showTab(parseHash().tab);
+boot().then(() => { applyRoute(); poll(); setTimeout(syncEyes, 3000); });
 </script>
 </body>
 </html>
