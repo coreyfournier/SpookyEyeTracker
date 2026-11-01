@@ -9,7 +9,8 @@ os.makedirs(OUT, exist_ok=True)
 
 R_EYE, T_EYE = 51.0, 2.5          # 102mm OD eye; T_EYE = structural wall (rear, collar)
 FRONT_WALL = 1.2                 # white of the eye: thin enough for the ring LEDs to glow through
-IRIS_R = 20.0                    # iris radius (0.8mm light window, lit by the centre LED)
+IRIS_R = 20.0                    # iris radius (light window, lit by the centre LED)
+IRIS_RECESS = 0.4                # iris sunk into the outside: window = FRONT_WALL - IRIS_RECESS = 0.8mm
 R_LO, R_LI = 56.5, 54.0          # eyelid shell
 PIN = 1.65                       # M3 / 3mm pin clearance radius
 TAP = 1.4                        # M3 self-tap radius
@@ -62,10 +63,11 @@ def eye_full():
     for s in (1, -1):
         b, h = boss(s); bosses += b; holes += h
     e = (e + (bosses ^ sphere(R_EYE - 0.3))) - holes
-    # iris recess (paint a pupil / iris pattern, or inlay)
-    e -= (sphere(R_EYE + 1) - sphere(R_EYE - 0.8)) ^ cyl_y(20, 0, 60)
-    # ---- glowing iris: thin the iris to a 0.8mm light window ----
-    e -= sphere(R_EYE - 1.6) ^ cyl_y(IRIS_R, 0, 60)      # 50.2 outer -> 49.4 inner
+    # iris recess (paint a pupil / iris pattern, or inlay). The iris is thinned only from the
+    # outside: the inside stays one smooth sphere (eye_halves thins it to FRONT_WALL), so each
+    # layer of the iris prints straight onto the white next to it. Thinning it from the inside
+    # too left the iris rim starting in mid-air and printing stringy.
+    e -= (sphere(R_EYE + 1) - sphere(R_EYE - IRIS_RECESS)) ^ cyl_y(IRIS_R, 0, 60)
     # LED hardware now lives on the separate led_insert() part
     # rear opening for the support stalk
     e -= cyl_y(30, -60, -20)
@@ -115,10 +117,9 @@ def eye_halves():
     # inside the cap's inner surface, so the two never touch and the cap rim prints in mid-air.
     # Lives entirely above the seam, so the rear socket/bayonet are unaffected.
     front += ring_y(R_EYE, LIP_I, SEAM, SEAM + COLLAR_H) ^ sphere(R_EYE - 0.5)
-    # thin the white of the eye to FRONT_WALL so the six ring LEDs glow through it; the
-    # bayonet collar and the iris window (already 0.8mm) keep their thickness
-    # (0.3mm margin of full wall around the iris keeps the cut from grazing the window edge)
-    front -= (sphere(R_EYE - FRONT_WALL) - cyl_y(IRIS_R + 0.3, 0, 60)) ^ box(-60, 60, SEAM + COLLAR_H, 60, -60, 60)
+    # thin the white of the eye (and the iris, under its recess) to FRONT_WALL so the LEDs glow
+    # through it; the bayonet collar keeps its thickness
+    front -= sphere(R_EYE - FRONT_WALL) ^ box(-60, 60, SEAM + COLLAR_H, 60, -60, 60)
     return front, rear
 
 def front_rim_support():
@@ -141,7 +142,7 @@ def led_insert():
     LEDs' light out of it, so they light the white of the eye instead. Prints back-face down
     without supports (45 deg walls). Glue the rim to the inside of the iris window. White PLA
     reflects the most light; if iris and white bleed into each other, paint the outside dark."""
-    win_in = R_EYE - 1.6                       # iris window inner surface
+    win_in = R_EYE - FRONT_WALL                # iris window inner surface
     r0, r1 = 3.8, IRIS_R - 0.8                 # funnel inner radius at the LED plane / at the window
     y1 = np.sqrt((win_in - 0.15) ** 2 - r1 ** 2) + 1.5   # run past the window, then clip to it
     k = (r1 - r0) / (y1 - P)                   # radius growth per mm
