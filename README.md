@@ -40,11 +40,24 @@ The system has three parts, and each has its own guide:
 Detection knows nothing about eyes, and eyes know nothing about cameras. To add an eye,
 flash another board and add an entry for it in the tracker's config (or the UI).
 
+![Top-down yard map: two cameras' fields of view, the eye in the front window, people and the eye's gaze line](docs/images/yard-map.png)
+
+<p align="center"><i>The live yard map on Halloween night: both cameras' fields of view (blue), the eye in the
+front window (orange) and the line it's looking along, and everyone the cameras see, with
+their position and eye height.</i></p>
+
+This is a real capture, taken before the cameras were calibrated, and it shows why
+calibration matters. The two cameras disagree about where one person is standing, so
+they appear as two people (#1 and #3) about 3 m apart, and one camera puts their eyes
+2.04 m off the ground. The phone [camera calibration wizard](docs/TRACKER.md#cameras-do-this-first)
+fixes this by walking you around the yard: afterwards both cameras place you in the same
+spot, and they measure your height correctly.
+
 ![Both camera views with a detected person](docs/images/live-cameras.jpg)
 
-The tracker's web UI shows each camera with the people it found, a top-down yard map,
-and a settings card for every eye and camera. There are also phone pages for calibrating
-the cameras and the eyes' aim while you stand in the yard. Take the full tour in
+The tracker's web UI shows each camera with the people it found, the yard map, and a
+settings card for every eye and camera. There are also phone pages for calibrating the
+cameras and the eyes' aim while you stand in the yard. Take the full tour in
 [docs/TRACKER.md](docs/TRACKER.md#the-web-ui).
 
 ## What you need
