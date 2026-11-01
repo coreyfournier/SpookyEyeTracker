@@ -138,12 +138,14 @@ static void updateLeds(uint32_t now) {
   }
 
   bool flash = now < startleUntil && (now + STARTLE_MS - startleUntil) < 150;
-  Rgb ring = flash ? Rgb{255, 255, 255} : scale(iris, level);
+  Rgb centre = flash ? Rgb{255, 255, 255} : scale(iris, level);
+  Rgb white = flash ? Rgb{255, 255, 255} : scale(cfg.sclera, level);
 
   leds.setBrightness(cfg.brightness);
-  // Jewel: LED 0 is the centre (pupil), 1..6 form the iris ring.
-  leds.setPixelColor(0, cfg.pupil.r, cfg.pupil.g, cfg.pupil.b);
-  for (int i = 1; i < NUM_LEDS; i++) leds.setPixelColor(i, ring.r, ring.g, ring.b);
+  // Jewel: LED 0 is the centre - the LED insert's funnel carries it to the iris.
+  // LEDs 1..6 are the ring, outside the funnel - they light the white of the eye.
+  leds.setPixelColor(0, centre.r, centre.g, centre.b);
+  for (int i = 1; i < NUM_LEDS; i++) leds.setPixelColor(i, white.r, white.g, white.b);
   leds.show();
 }
 

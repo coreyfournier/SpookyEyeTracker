@@ -65,9 +65,11 @@ pin, which is for a 3.7 V LiPo only.
 
 ## Jewel LED order
 
-The firmware treats LED 0 as the centre (pupil) and LEDs 1-6 as the iris ring, which is
-the standard order for 7-LED jewels. If your board numbers them differently, the pupil
-colour will show up on an outer LED. Swap the indices in `behavior.cpp` `updateLeds()` if so.
+The firmware treats LED 0 as the centre and LEDs 1-6 as the ring, which is the standard
+order for 7-LED jewels. The LED insert's funnel carries the **centre LED to the iris** (iris
+colours: idle / track / sleep). The **six ring LEDs sit outside the funnel and light the white
+of the eye** (`sclera` colour). If your board numbers them differently, the iris and the
+white will swap colours: change the indices in `behavior.cpp` `updateLeds()`.
 
 ## First power-up
 

@@ -46,12 +46,12 @@ struct EyeConfig {
   float wanderMin = 1.5f, wanderMax = 5.0f;  // s between glances
   float wanderPan = 15.0f, wanderTilt = 6.0f;
 
-  // iris colour by state
+  // LEDs: centre LED = iris (colour by state), ring LEDs = white of the eye
   bool irisEnabled = true;
   Rgb irisIdle{255, 110, 0};
   Rgb irisTrack{255, 0, 0};
   Rgb irisSleep{40, 0, 0};
-  Rgb pupil{0, 0, 0};
+  Rgb sclera{90, 80, 60};  // white of the eye (the six ring LEDs)
   uint8_t brightness = 160;
 
   // spooky mode

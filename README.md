@@ -142,7 +142,8 @@ Lengths are approximate, so check against your prints.
 
 | Part | Filament |
 |------|----------|
-| `eye_front.stl` | White or translucent **regular** PLA, so the iris glows (matte PLA blocks most light) |
+| `eye_front.stl` | White or translucent **regular** PLA: the whole front glows (matte PLA blocks most light) |
+| `led_insert.stl` | White PLA (reflects the most light into the iris and the white of the eye) |
 | Everything else | Any PLA. Matte is fine |
 
 **Tracker (one per installation)**
@@ -270,9 +271,27 @@ triangulate it. `world.look_height` is used only when height can't be measured.
 ## 5. Print
 
 Generate the parts with `.venv\Scripts\python cad\build.py` (needs `trimesh` and
-`manifold3d`). `eye_front.stl` includes a snap-off support ring under its mating rim. Print
-it seam-face down and remove the ring afterwards. `eye_front_nosupport.stl` is the same part
-for slicer-generated supports. Use tree supports for the inside of the iris dome.
+`manifold3d`).
+
+**How the eye lights up.** The whole front of the eye glows, in two zones:
+
+| Zone | Shell thickness | Lit by |
+|------|-----------------|--------|
+| Iris (40 mm circle) | 0.8 mm | The jewel's **centre LED**, carried out to the iris by the LED insert's funnel |
+| White of the eye | 1.2 mm | The **six ring LEDs**, which sit outside the funnel |
+
+The firmware drives them separately: the iris shows the state colour (idle / tracking /
+sleep) and the white shows the `sclera` colour. Paint a pupil on the iris if you want one.
+
+**Printing tips.**
+- `eye_front.stl` includes a snap-off support ring under its mating rim. Print it seam-face
+  down and remove the ring afterwards. Turn on supports (build plate only, tree style) for
+  the inside of the iris dome. They're reachable through the open back.
+  `eye_front_nosupport.stl` is the same part without the ring, for slicer-generated supports.
+- `led_insert.stl` prints back-face down with no supports (45° walls). Glue its rim to the
+  inside of the iris. If the iris and the white bleed into each other, paint the funnel's
+  outside dark.
+- `eye_rear.stl` has snap-off blocks under its pivot bosses, and `yoke.stl` sits flat.
 
 ## Tests and CI
 

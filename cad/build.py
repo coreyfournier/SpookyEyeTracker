@@ -7,7 +7,9 @@ SEG = 96
 OUT = os.path.dirname(os.path.abspath(__file__)) + "/stl"
 os.makedirs(OUT, exist_ok=True)
 
-R_EYE, T_EYE = 51.0, 2.5          # 102mm OD eye
+R_EYE, T_EYE = 51.0, 2.5          # 102mm OD eye; T_EYE = structural wall (rear, collar)
+FRONT_WALL = 1.2                 # white of the eye: thin enough for the ring LEDs to glow through
+IRIS_R = 20.0                    # iris radius (0.8mm light window, lit by the centre LED)
 R_LO, R_LI = 56.5, 54.0          # eyelid shell
 PIN = 1.65                       # M3 / 3mm pin clearance radius
 TAP = 1.4                        # M3 self-tap radius
@@ -60,10 +62,10 @@ def eye_full():
     for s in (1, -1):
         b, h = boss(s); bosses += b; holes += h
     e = (e + (bosses ^ sphere(R_EYE - 0.3))) - holes
-    # iris + pupil recesses (paint or inlay)
+    # iris recess (paint a pupil / iris pattern, or inlay)
     e -= (sphere(R_EYE + 1) - sphere(R_EYE - 0.8)) ^ cyl_y(20, 0, 60)
     # ---- glowing iris: thin the iris to a 0.8mm light window ----
-    e -= sphere(R_EYE - 1.6) ^ cyl_y(20, 0, 60)          # 50.2 outer -> 49.4 inner
+    e -= sphere(R_EYE - 1.6) ^ cyl_y(IRIS_R, 0, 60)      # 50.2 outer -> 49.4 inner
     # LED hardware now lives on the separate led_insert() part
     # rear opening for the support stalk
     e -= cyl_y(30, -60, -20)
@@ -113,6 +115,10 @@ def eye_halves():
     # inside the cap's inner surface, so the two never touch and the cap rim prints in mid-air.
     # Lives entirely above the seam, so the rear socket/bayonet are unaffected.
     front += ring_y(R_EYE, LIP_I, SEAM, SEAM + COLLAR_H) ^ sphere(R_EYE - 0.5)
+    # thin the white of the eye to FRONT_WALL so the six ring LEDs glow through it; the
+    # bayonet collar and the iris window (already 0.8mm) keep their thickness
+    # (0.3mm margin of full wall around the iris keeps the cut from grazing the window edge)
+    front -= (sphere(R_EYE - FRONT_WALL) - cyl_y(IRIS_R + 0.3, 0, 60)) ^ box(-60, 60, SEAM + COLLAR_H, 60, -60, 60)
     return front, rear
 
 def front_rim_support():
@@ -121,31 +127,35 @@ def front_rim_support():
     print in mid-air. Stops PRINT_GAP below the rim and clears the bayonet lugs (r 48.45)."""
     return ring_y(50.0, 48.75, LIP_Y0, SEAM - PRINT_GAP)
 
-# ---------------- LED INSERT (WS2812 Jewel x7 + pupil cone) ----------------
+# ---------------- LED INSERT (WS2812 jewel: centre LED -> iris, 6 ring LEDs -> white of the eye) ----
 JEWEL_HOLE_X = 9.2            # half of ~18.4mm hole spacing (measure yours!)
-LED_FACE = 36.0               # Jewel LED-side PCB face (y)
-P = LED_FACE + 1.75           # insert back plane: 1.6mm LED height + clearance (M2 nut spacer)
+LED_FACE = 28.0               # Jewel LED-side PCB face (y). Deep enough that the funnel walls are 45 deg
+P = LED_FACE + 1.75           # insert back plane: 1.6mm LED height + clearance
+FUNNEL_WALL = 1.6             # horizontal wall: thick enough that ring-LED light doesn't leak into the iris
+
+def frustum_y(r0, r1, y0, y1):
+    return M.cylinder(y1 - y0, r0, r1, SEG).rotate([-90, 0, 0]).translate([0, y0, 0])
 
 def led_insert():
-    """Prints back-face down, no supports. Glue tube rim to the cap's inner wall."""
-    # light baffle tube: confines glow to the iris
-    tube = (cyl_y(22, P, 52) - cyl_y(20.5, P - 1, 53)) ^ sphere(R_EYE - T_EYE - 0.15)
-    # pupil cone around centre LED: inner r 3.8 at LED -> 6.0 at the window
-    h = 52 - P
-    r_in0, r_in1 = 3.8, 3.8 + (6.0 - 3.8) * h / (49.25 - P)
-    cone_o = M.cylinder(h, r_in0 + 0.9, r_in1 + 0.9, SEG).rotate([-90, 0, 0]).translate([0, P, 0])
-    cone_i = M.cylinder(h + 2, r_in0, r_in1 + 0.2, SEG).rotate([-90, 0, 0]).translate([0, P - 1, 0])
-    cone = (cone_o ^ sphere(R_EYE - 1.6 - 0.15)) - cone_i
-    # cross arm (thin, sits above LED tops) + M2 screw posts at the Jewel holes
-    arm = box(-21, 21, P, P + 2.0, -1.5, 1.5)
-    posts = M()
+    """Iris funnel. Carries the centre LED's light out to the iris window and keeps the six ring
+    LEDs' light out of it, so they light the white of the eye instead. Prints back-face down
+    without supports (45 deg walls). Glue the rim to the inside of the iris window. White PLA
+    reflects the most light; if iris and white bleed into each other, paint the outside dark."""
+    win_in = R_EYE - 1.6                       # iris window inner surface
+    r0, r1 = 3.8, IRIS_R - 0.8                 # funnel inner radius at the LED plane / at the window
+    y1 = np.sqrt((win_in - 0.15) ** 2 - r1 ** 2) + 1.5   # run past the window, then clip to it
+    k = (r1 - r0) / (y1 - P)                   # radius growth per mm
+    outer = frustum_y(r0 + FUNNEL_WALL, r1 + FUNNEL_WALL, P, y1)
+    inner = frustum_y(r0 - k, r1 + k, P - 1, y1 + 1)       # same cone, extended 1mm each end
+    funnel = (outer ^ sphere(win_in - 0.15)) - inner
+    # cross arm on the back plane, with M2 screw bosses at the jewel's mounting holes
+    arm = box(-12, 12, P, P + 3.0, -1.5, 1.5)
     for x in (-JEWEL_HOLE_X, JEWEL_HOLE_X):
-        posts += cyl_y(2.0, P, P + 5, x=x)
+        arm += cyl_y(2.0, P, P + 4.5, x=x)
     holes = M()
     for x in (-JEWEL_HOLE_X, JEWEL_HOLE_X):
-        holes += cyl_y(0.8, P - 1, P + 4.5, x=x)
-    ins = tube + cone + ((arm + posts) - cyl_y(r_in0 + 0.5, P - 1, 60) - cone_i - (sphere(80) - sphere(R_EYE - T_EYE - 0.15)))
-    return ins - holes
+        holes += cyl_y(0.8, P - 1, P + 4.3, x=x)
+    return (funnel + (arm - inner)) - holes
 
 # ---------------- YOKE (inside eye) ----------------
 def yoke():
