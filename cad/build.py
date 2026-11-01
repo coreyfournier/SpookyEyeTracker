@@ -120,6 +120,7 @@ def eye_halves():
     # thin the white of the eye (and the iris, under its recess) to FRONT_WALL so the LEDs glow
     # through it; the bayonet collar keeps its thickness
     front -= sphere(R_EYE - FRONT_WALL) ^ box(-60, 60, SEAM + COLLAR_H, 60, -60, 60)
+    front += insert_shelves()
     return front, rear
 
 def front_rim_support():
@@ -133,6 +134,12 @@ JEWEL_HOLE_X = 9.2            # half of ~18.4mm hole spacing (measure yours!)
 LED_FACE = 28.0               # Jewel LED-side PCB face (y). Deep enough that the funnel walls are 45 deg
 P = LED_FACE + 1.75           # insert back plane: 1.6mm LED height + clearance
 FUNNEL_WALL = 1.6             # horizontal wall: thick enough that ring-LED light doesn't leak into the iris
+RIM_GAP = 0.05                # funnel rim to iris window, with the insert locked
+# twist-lock: the insert's arm reaches the cap wall; its end pads sit on shelves inside the cap
+LOCK_ANG = (90, 270)          # locked arm directions (deg, XZ plane, as LUG_ANG): top and bottom, under the lids
+LOCK_TWIST = 32               # insert turns +32 deg (counter-clockwise seen from the open back) to lock
+PAD_R0, PAD_HW = 33.0, 4.0    # arm end pad: inner radius, half width
+SHELF_R = 34.5                # shelf inner edge
 
 def frustum_y(r0, r1, y0, y1):
     return M.cylinder(y1 - y0, r0, r1, SEG).rotate([-90, 0, 0]).translate([0, y0, 0])
@@ -140,23 +147,49 @@ def frustum_y(r0, r1, y0, y1):
 def led_insert():
     """Iris funnel. Carries the centre LED's light out to the iris window and keeps the six ring
     LEDs' light out of it, so they light the white of the eye instead. Prints back-face down
-    without supports (45 deg walls). Glue the rim to the inside of the iris window. White PLA
-    reflects the most light; if iris and white bleed into each other, paint the outside dark."""
+    without supports (45 deg walls). Push it into the front cap until the rim meets the iris
+    and twist it to click onto the cap's shelves (insert_shelves). White PLA reflects the most
+    light; if iris and white bleed into each other, paint the outside dark."""
     win_in = R_EYE - FRONT_WALL                # iris window inner surface
     r0, r1 = 3.8, IRIS_R - 0.8                 # funnel inner radius at the LED plane / at the window
-    y1 = np.sqrt((win_in - 0.15) ** 2 - r1 ** 2) + 1.5   # run past the window, then clip to it
+    y1 = np.sqrt((win_in - RIM_GAP) ** 2 - r1 ** 2) + 1.5   # run past the window, then clip to it
     k = (r1 - r0) / (y1 - P)                   # radius growth per mm
     outer = frustum_y(r0 + FUNNEL_WALL, r1 + FUNNEL_WALL, P, y1)
     inner = frustum_y(r0 - k, r1 + k, P - 1, y1 + 1)       # same cone, extended 1mm each end
-    funnel = (outer ^ sphere(win_in - 0.15)) - inner
-    # cross arm on the back plane, with M2 screw bosses at the jewel's mounting holes
-    arm = box(-12, 12, P, P + 3.0, -1.5, 1.5)
+    funnel = (outer ^ sphere(win_in - RIM_GAP)) - inner
+    # cross arm on the back plane, with screw bosses at the jewel's mounting holes. It runs out
+    # to the cap wall, ending in the twist-lock pads.
+    arm = box(-41, 41, P, P + 3.0, -1.5, 1.5)
+    for s in (1, -1):
+        pad = box(PAD_R0, 41, P, P + 2.5, -PAD_HW, PAD_HW)
+        # 45 deg chamfers on the pad's lower edges, so it rides up over the detent bump
+        for z in (-PAD_HW, PAD_HW):
+            pad -= M.cube([20, 0.85, 0.85], True).rotate([45, 0, 0]).translate([37, P, z])
+        arm += pad if s > 0 else pad.rotate([0, 180, 0])
+    arm = arm ^ sphere(win_in - 0.5)
     for x in (-JEWEL_HOLE_X, JEWEL_HOLE_X):
         arm += cyl_y(2.0, P, P + 4.5, x=x)
     holes = M()
     for x in (-JEWEL_HOLE_X, JEWEL_HOLE_X):
         holes += cyl_y(0.8, P - 1, P + 4.3, x=x)
-    return (funnel + (arm - inner)) - holes
+    # built with the arm along X; turn it to the locked direction (LOCK_ANG, +X -> +Z)
+    return ((funnel + (arm - inner)) - holes).rotate([0, -90, 0])
+
+def insert_shelves():
+    """Twist-lock catches inside the front cap, one per LOCK_ANG. Turning the insert (+angle)
+    its pad rides a lead-in ramp, clicks over a one-layer bump, seats, and meets an end stop.
+    The 45 deg underside grows out of the wall, so the cap still prints seam-down unsupported."""
+    def band(a1, a2, top):
+        body = cyl_y(R_EYE, top - 16, top) - frustum_y(SHELF_R + 16, SHELF_R, top - 16, top)
+        return body ^ wedge_y(a1, a2, top - 17, top + 1)
+    s = M()
+    for a in LOCK_ANG:
+        s += band(a - 20, a - 14, P - 0.4)        # lead-in
+        s += band(a - 14, a - 11, P - 0.2)
+        s += band(a - 11, a - 7.5, P + 0.4)       # detent bump (arms flex ~0.35mm to pass)
+        s += band(a - 7.5, a + 7.5, P)            # seat: pad bottom face
+        s += band(a + 7.5, a + 12, P + 2.5)       # end stop
+    return s ^ sphere(R_EYE - 0.6)
 
 # ---------------- YOKE (inside eye) ----------------
 def yoke():
@@ -461,8 +494,12 @@ if __name__ == "__main__":
     for nm, a, b in [("eye-frame", eye, fr), ("eye-lidU_open", eye, lu_open), ("eye-lidL_open", eye, ll_open),
                      ("eye-lidU_closed", eye, lu), ("lidU-lidL_closed", lu, ll), ("lidU-lidL_open", lu_open, ll_open),
                      ("lids-frame", lu_open + ll_open, fr), ("lidsC-frame", lu + ll, fr), ("eye-stalk", eye, st),
-                     ("yoke-stalk", yk, st), ("servos-frame", servos(), fr)]:
+                     ("yoke-stalk", yk, st), ("servos-frame", servos(), fr), ("insert-eye", li, eye)]:
         print(nm, "overlap vol %.1f" % (a ^ b).volume())
+    # insert twist-lock: at the unlocked angle it must slide all the way in past the shelves
+    li_free = li.rotate([0, LOCK_TWIST, 0])
+    print("insert entry path overlap %.1f" % max((li_free.translate([0, -d, 0]) ^ front).volume()
+                                                 for d in (0, 0.5, 1, 2, 4, 8, 16)))
     # eye rotated range check
     for ang in [(20, 0, 0), (-20, 0, 0), (0, 0, 20), (0, 0, -20), (15, 0, 15)]:
         er = eye.rotate(list(ang))

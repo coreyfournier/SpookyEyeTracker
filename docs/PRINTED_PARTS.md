@@ -32,7 +32,7 @@ lattice frame (left). The frame on its own (right).</i></p>
 | `frame.stl` | Window plate, cup pocket, base tray, servo cradles, lid pivots and the stalk pedestal, in one piece |
 | `eye_front.stl` | Front of the eyeball: the glowing white and iris. Twist-locks onto the rear (bayonet with a click detent) |
 | `eye_rear.stl` | Back of the eyeball: the side pivot bosses and the tabs the pan and tilt pushrods pull on |
-| `led_insert.stl` | Funnel that carries the jewel's centre LED to the iris and keeps the ring LEDs' light on the white |
+| `led_insert.stl` | Funnel that carries the jewel's centre LED to the iris and keeps the ring LEDs' light on the white. Twist-locks into the front of the eye |
 | `lid_upper.stl`, `lid_lower.stl` | Eyelids, each with a lever arm for its servo pushrod |
 | `yoke.stl` | Gimbal cross-piece: the eye pivots on its ends (tilt), and it turns on the stalk (pan) |
 | `stalk.stl` | Arm from the frame's pedestal forward to the yoke |
@@ -89,9 +89,18 @@ sleep) and the white shows the `sclera` colour (see
   down and remove the ring afterwards. Turn on supports (build plate only, tree style) for
   the inside of the iris dome; they're reachable through the open back.
   `eye_front_nosupport.stl` is the same part without the ring, for slicer-generated supports.
-- `led_insert.stl` prints back-face down with no supports (45° walls). Glue its rim to the
-  inside of the iris. If the iris and the white bleed into each other, paint the funnel's
-  outside dark.
+- `led_insert.stl` prints back-face down with no supports (45° walls). If the iris and the
+  white bleed into each other, paint the funnel's outside dark.
+
+**Fitting the LED insert.** No glue needed: the insert twist-locks into the front of the eye.
+1. Screw the jewel onto the insert first.
+2. Hold the front of the eye open side towards you. Turn the insert so its long arm points
+   about 30° clockwise from the two small shelves inside the wall (top and bottom).
+3. Push it in until the funnel's rim touches the inside of the iris.
+4. Twist it counter-clockwise. The arm ends ride up onto the shelves, click over a small
+   bump, and stop against the end stops. The arm then points straight up and down, where the
+   lids hide it.
+5. To take it out, twist it back clockwise and pull.
 - `eye_rear.stl` has snap-off blocks under its pivot bosses, and `yoke.stl` sits flat.
 
 **Frame.** To save filament and print time, every wall of the frame is a thin plate with
