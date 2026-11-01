@@ -9,6 +9,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .config import MAX_CAMERAS, ConfigError
+from .geometry import DEFAULT_AIM
 
 STATIC = Path(__file__).resolve().parent / "static"
 SETTINGS_SECTIONS = ("world", "tracking", "director", "detection")
@@ -89,14 +90,14 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
         eye = eye_or_404(eye_id)
         servos = eye["firmware"]["servos"]
         return {"target": calib.target_info(eye), "samples": calib.samples(eye), "fit": calib.fit(eye),
-                "current": {a: {"center": servos[a]["center"], "us_per_deg": servos[a]["us_per_deg"]}
-                            for a in ("pan", "tilt")},
+                "aim": {**DEFAULT_AIM, **(eye.get("aim") or {})},
+                "limits": {a: [servos[a]["min"], servos[a]["max"]] for a in ("pan", "tilt")},
                 "eye": link.status(eye)}
 
     @app.post("/api/calib/{eye_id}/capture")
     def calib_capture(eye_id: str, body: dict = Body(...)):
         try:
-            calib.capture(eye_or_404(eye_id), body["pan_us"], body["tilt_us"])
+            calib.capture(eye_or_404(eye_id), body["pan"], body["tilt"])
         except ValueError as exc:
             raise HTTPException(409, str(exc))
         return {"ok": True}
@@ -112,14 +113,19 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
         return {"ok": True}
 
     @app.post("/api/calib/{eye_id}/apply")
-    async def calib_apply(eye_id: str):
+    def calib_apply(eye_id: str):
+        """Save the fitted aim correction on the PC - nothing is pushed to the eye."""
         eye_or_404(eye_id)
         try:
             eye = calib.apply(eye_id)
         except ValueError as exc:
             raise HTTPException(409, str(exc))
-        pushed = await asyncio.to_thread(link.push_config, eye)
-        return {"saved": True, "pushed": pushed}
+        return {"saved": True, "aim": eye["aim"]}
+
+    @app.post("/api/calib/{eye_id}/reset")
+    def calib_reset(eye_id: str):
+        eye_or_404(eye_id)
+        return {"saved": True, "aim": calib.reset(eye_id)["aim"]}
 
     # ---------- cameras & settings ----------
     @app.post("/api/cameras")

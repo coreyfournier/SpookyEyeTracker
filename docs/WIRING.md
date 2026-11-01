@@ -46,4 +46,7 @@ colour will show up on an outer LED. Swap the indices in `behavior.cpp` `updateL
    ahead, then press **Set centre**. Do the same for tilt, then set open/closed for each lid.
 3. Fit the horns/pushrods at those positions, then tune `us_per_deg` (and flip its sign if a
    servo moves the wrong way). Use the **Pan °/Tilt °** sliders to confirm ±20° looks right.
-4. **Save & Push**.
+4. **Save & Push**. This is the eye's *mechanical* calibration and is stored on the ESP32.
+   Aiming at people (correcting for camera placement) is done separately with calibrate by
+   pointing, which stays on the PC and never needs another push. See the README's
+   **Calibrate** section.

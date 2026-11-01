@@ -82,12 +82,14 @@ Open `/calibrate` on your phone and stand in the yard. The page shows who the ca
 see, how far away they are, and their eye-level height.
 
 1. **Snap to me** points the eye where the tracker thinks you are.
-2. Use the arrows to nudge it until it's looking right at you, then tap **Capture this spot**.
+2. Use the arrows (0.5° or 3° steps) to nudge it until it's looking right at you, then
+   tap **Capture this spot**.
 3. Repeat at 4-5 spots.
 
-The tracker fits each servo's center and scale (µs per degree) from those samples. This
-absorbs servo offsets, linkage ratios and camera-pose errors in one step. **Apply** saves
-and pushes the result.
+The tracker fits an **aim correction** for each axis (offset + scale) from those samples.
+It lives only on the PC and is applied to every angle before it's sent. **Apply** takes
+effect immediately, with nothing pushed to the eye. **Reset** clears it, e.g. after moving a
+camera.
 
 <br clear="right">
 
@@ -229,11 +231,27 @@ view draws a 2 m ground grid, a ★ where the eye should be, and a yellow dot on
 detected face. Adjust `position`/`heading`/`pitch` on the **Cameras** tab until the grid
 lies flat on the lawn. Stand at a measured spot and check the yard map puts you there.
 
-**Eyes (calibrate by pointing).** Open `/calibrate` on your phone and stand in the yard.
+Eye calibration has two layers, which change for different reasons:
+
+| Layer | Lives on | Set with | Redo when |
+|---|---|---|---|
+| **Servo mechanics**: `firmware.servos` (center µs, µs/deg, limits, lid open/closed) | ESP32 (pushed once, stored in flash) | Eyes tab sliders, with the eye looking straight ahead from its own point of view | You rebuild or re-horn the eye |
+| **Aim correction**: `aim` (pan/tilt offset + scale) | PC only, never pushed | Calibrate by pointing | You move a camera or the eye |
+
+The mechanics stay on the eye so it can idle, wander, sleep and respect its limits even
+when the PC is offline. The aim correction absorbs camera and eye position errors. Keeping
+it on the PC means moving a camera never disturbs the eye's own settings.
+
+**Servo mechanics (once per build).** In the Eyes tab, use the µs sliders to find each
+servo's centre and the lid open/closed positions. Press the buttons to copy them into the
+form, then **Save & Push**. If an arrow on the calibration page moves the eye the wrong
+way, flip the sign of that axis's `us_per_deg` here.
+
+**Aim (calibrate by pointing).** Open `/calibrate` on your phone and stand in the yard.
 1. **Snap to me**, nudge the eye with the arrows until it looks right at you, then **Capture**.
-2. One spot sets zero. 4-5 spots (left, centre, right, near, far) also fit the scale and
-   catch a reversed servo.
-3. **Apply — Save & Push** writes `center`/`us_per_deg` and pushes them to the eye.
+2. One spot sets the offset. 4-5 spots (left, centre, right, near, far) also fit the scale.
+3. **Apply** saves the correction on the PC and it takes effect immediately. Nothing is
+   pushed to the eye.
 
 **Eye-level height.** The pose model finds each person's eyes, falling back to their ears,
 then shoulders, then 1/16 of the way down the box. With the feet visible, one camera

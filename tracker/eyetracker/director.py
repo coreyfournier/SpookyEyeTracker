@@ -11,7 +11,7 @@ import math
 import threading
 import time
 
-from .geometry import eye_angles
+from .geometry import apply_aim, eye_angles
 
 log = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ def _candidates(eye, people, look_height, max_pan):
     out = []
     for p in people:
         pan, tilt = eye_angles(eye, (p.x, p.y), p.face_h or look_height)
-        if abs(pan) <= max_pan:
+        if abs(pan) <= max_pan:   # filter on true geometry; send the aim-corrected angles
             dist = math.hypot(p.x - eye["position"][0], p.y - eye["position"][1])
-            out.append((dist, p, pan, tilt))
+            out.append((dist, p, *apply_aim(eye, pan, tilt)))
     return sorted(out, key=lambda c: c[0])
 
 
@@ -102,7 +102,7 @@ class Director:
             eid = eye["id"]
             ov = self.overrides.get(eid)
             if ov and ov[2] > now:
-                pan, tilt = eye_angles(eye, ov[:2], cfg["world"]["look_height"])
+                pan, tilt = apply_aim(eye, *eye_angles(eye, ov[:2], cfg["world"]["look_height"]))
                 self.link.look(eye, True, pan, tilt)
                 self.assignments[eid] = {"person": None, "override": [ov[0], ov[1]],
                                          "pan": round(pan, 1), "tilt": round(tilt, 1)}

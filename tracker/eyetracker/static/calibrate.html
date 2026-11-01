@@ -78,12 +78,12 @@
       <span></span><button id="down" aria-label="Down">▼</button><span></span>
     </div>
     <div class="row">
-      <div class="seg" id="step"><button data-s="0.5" class="on">Fine</button><button data-s="3">Coarse</button></div>
-      <button id="flipPan">Flip ◀▶</button><button id="flipTilt">Flip ▲▼</button>
+      <div class="seg" id="step"><button data-s="0.5" class="on">Fine 0.5°</button><button data-s="3">Coarse 3°</button></div>
     </div>
     <div class="us" id="us">not controlling the eye</div>
     <div class="muted" style="margin-top:8px">Arrows move the eye as you see it, facing it. Stand still with your eyes level, then nudge
-      the eye until it looks right at you. If an arrow moves the wrong way, tap Flip.</div>
+      the eye until it looks right at you. If an arrow moves the eye the wrong way, its servo direction is reversed:
+      flip the sign of <i>us per deg</i> on the main UI's Eyes tab (servo setup), then Save &amp; Push.</div>
     <button class="wide primary" id="capture" style="margin-top:12px">Capture this spot</button>
   </div>
 
@@ -94,10 +94,13 @@
   </div>
 
   <div class="card">
-    <h2>Fit</h2>
+    <h2>Aim correction</h2>
     <table id="fit"></table>
+    <div class="muted" style="margin-top:8px">Stored on the tracker and applied to every angle it sends. Nothing is pushed to the
+      eye, so it takes effect immediately.</div>
     <div class="row" style="margin-top:12px">
-      <button class="primary" id="apply">Apply — Save &amp; Push</button>
+      <button class="primary" id="apply">Apply</button>
+      <button id="reset" title="Back to no correction, e.g. after moving a camera (samples are kept)">Reset</button>
       <button id="clear">Clear samples</button>
     </div>
   </div>
@@ -114,27 +117,24 @@ const api = async (path, body) => {
 const toast = msg => { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h);
   t._h = setTimeout(() => t.classList.remove('show'), 2500); };
 
-let eyeId = null, data = null, active = false, panUs = 1500, tiltUs = 1500, stepDeg = 0.5;
-const flip = {pan: 1, tilt: 1};
+// Jogging is in eye-space degrees, so the eye's own servo calibration and limits apply.
+let eyeId = null, data = null, active = false, pan = 0, tilt = 0, stepDeg = 0.5;
+const clamp = (v, [lo, hi]) => Math.max(lo, Math.min(hi, v));
 
 function send() {
   active = true;
-  panUs = Math.max(500, Math.min(2500, Math.round(panUs)));
-  tiltUs = Math.max(500, Math.min(2500, Math.round(tiltUs)));
-  $('#us').textContent = `pan ${panUs} µs · tilt ${tiltUs} µs`;
-  api(`/api/eyes/${eyeId}/manual`, {pan: 0, tilt: 0, lid: 1, raw: [panUs, tiltUs, 0, 0], hold_s: 20})
-    .catch(e => toast(e.message));
+  if (data?.limits) { pan = clamp(pan, data.limits.pan); tilt = clamp(tilt, data.limits.tilt); }
+  pan = Math.round(pan * 10) / 10; tilt = Math.round(tilt * 10) / 10;
+  $('#us').textContent = `pan ${pan.toFixed(1)}° · tilt ${tilt.toFixed(1)}°`;
+  api(`/api/eyes/${eyeId}/manual`, {pan, tilt, lid: 1, hold_s: 20}).catch(e => toast(e.message));
 }
 function startFromPrediction() {
-  const t = data?.target, cur = data?.current;
-  if (t) { panUs = t.pred_pan_us; tiltUs = t.pred_tilt_us; }
-  else if (cur) { panUs = cur.pan.center; tiltUs = cur.tilt.center; }
+  const t = data?.target;
+  if (t) { pan = t.aim_pan; tilt = t.aim_tilt; } else { pan = 0; tilt = 0; }
 }
 function nudge(axis, dir) {
   if (!active) startFromPrediction();
-  const k = data?.current?.[axis]?.us_per_deg || 30;   // signed, so arrows follow the servo direction
-  const d = dir * stepDeg * k * flip[axis];
-  if (axis === 'pan') panUs += d; else tiltUs += d;
+  if (axis === 'pan') pan += dir * stepDeg; else tilt += dir * stepDeg;
   send();
 }
 // ◀ = toward your left as you face the eye = the eye's +pan
@@ -148,24 +148,26 @@ $('#snap').onclick = () => {
 };
 $('#release').onclick = () => { active = false; $('#us').textContent = 'not controlling the eye';
   api(`/api/eyes/${eyeId}/release`, {}); };
-$('#flipPan').onclick = () => { flip.pan *= -1; $('#flipPan').classList.toggle('primary', flip.pan < 0); };
-$('#flipTilt').onclick = () => { flip.tilt *= -1; $('#flipTilt').classList.toggle('primary', flip.tilt < 0); };
 document.querySelectorAll('#step button').forEach(b => b.onclick = () => {
   stepDeg = parseFloat(b.dataset.s);
   document.querySelectorAll('#step button').forEach(x => x.classList.toggle('on', x === b));
 });
 $('#capture').onclick = async () => {
   if (!active) return toast('Point the eye at yourself first');
-  try { await api(`/api/calib/${eyeId}/capture`, {pan_us: panUs, tilt_us: tiltUs}); toast('Captured ✓ — move to a new spot');
+  try { await api(`/api/calib/${eyeId}/capture`, {pan, tilt}); toast('Captured ✓ — move to a new spot');
         refresh(); }
   catch (e) { toast(e.message); }
 };
 $('#apply').onclick = async () => {
   try {
-    const r = await api(`/api/calib/${eyeId}/apply`, {});
-    toast(r.pushed ? 'Saved and pushed ✓' : 'Saved, but the eye did not acknowledge — use Push in the main UI');
+    await api(`/api/calib/${eyeId}/apply`, {});
+    toast('Aim correction saved ✓ — in effect now');
     refresh();
   } catch (e) { toast(e.message); }
+};
+$('#reset').onclick = async () => {
+  if (!confirm('Remove the aim correction for this eye? Samples are kept, so you can Apply again.')) return;
+  await api(`/api/calib/${eyeId}/reset`, {}); toast('Aim correction reset'); refresh();
 };
 $('#clear').onclick = async () => {
   if (!confirm('Delete all samples for this eye?')) return;
@@ -191,7 +193,7 @@ function render() {
   const s = data.samples;
   $('#count').textContent = `(${s.length})`;
   $('#samples').innerHTML = s.map((x, i) => `<li>(${x.x.toFixed(1)}, ${x.y.toFixed(1)}) m, eyes ${x.face_h ? x.face_h.toFixed(2) + ' m' : '—'}
-      → ${x.pan_us}/${x.tilt_us} µs <button data-del="${i}" aria-label="Delete sample">✕</button></li>`).join('');
+      → ${x.pan_cmd}° / ${x.tilt_cmd}° <button data-del="${i}" aria-label="Delete sample">✕</button></li>`).join('');
   $('#samples').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
     await api(`/api/calib/${eyeId}/delete`, {index: +b.dataset.del}); refresh(); });
   const pans = s.map(x => x.pan), spread = pans.length ? Math.max(...pans) - Math.min(...pans) : 0;
@@ -199,14 +201,14 @@ function render() {
     : spread < 8 ? 'Add spots further left and right (and one closer, one further) so scale can be fitted too.'
     : 'Good spread. Apply, then walk around and check the eye follows you.';
 
-  const f = data.fit, c = data.current;
+  const f = data.fit, a = data.aim;
   const row = (axis) => {
     const r = f[axis];
-    return `<tr><td>${axis}</td><td>${c[axis].center} → <b>${r ? r.center : '—'}</b></td>
-      <td>${c[axis].us_per_deg} → <b>${r ? r.us_per_deg : '—'}</b></td><td>${r ? r.rms_deg + '°' : '—'}</td></tr>
+    return `<tr><td>${axis}</td><td>${a[axis + '_offset']}° → <b>${r ? r.offset + '°' : '—'}</b></td>
+      <td>×${a[axis + '_scale']} → <b>${r ? '×' + r.scale : '—'}</b></td><td>${r ? r.rms_deg + '°' : '—'}</td></tr>
       ${r ? `<tr><td></td><td colspan="3" class="muted" style="text-align:left">${r.mode}, ${r.n} sample${r.n > 1 ? 's' : ''}</td></tr>` : ''}`;
   };
-  $('#fit').innerHTML = `<tr><th></th><th>centre µs</th><th>µs/deg</th><th>error</th></tr>${row('pan')}${row('tilt')}`;
+  $('#fit').innerHTML = `<tr><th></th><th>offset</th><th>scale</th><th>error</th></tr>${row('pan')}${row('tilt')}`;
   $('#apply').disabled = !s.length;
 }
 

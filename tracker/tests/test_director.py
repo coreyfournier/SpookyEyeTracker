@@ -84,6 +84,17 @@ def test_tick_without_people_sends_no_target(store):
     assert link.looks == [("eye1", False, 0, 0, False)]
 
 
+def test_aim_correction_is_applied_to_sent_angles(store):
+    eye = store.eye("eye1")
+    eye["aim"] = {"pan_offset": 5.0, "pan_scale": 0.5, "tilt_offset": -1.0, "tilt_scale": 1.0}
+    store.replace_item("eyes", eye, save=False)
+    link = FakeLink()
+    d = Director(store, FakeWorld([]), link)
+    d.look_at("eye1", 5, 8)                                 # geometric pan 33.0 deg
+    d._tick(store.get())
+    assert link.looks[0][2] == pytest.approx(5.0 + 0.5 * 33.0, abs=0.1)
+
+
 def test_look_at_override(store):
     link = FakeLink()
     d = Director(store, FakeWorld([]), link)

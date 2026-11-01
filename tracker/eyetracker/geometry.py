@@ -116,6 +116,21 @@ def servo_us(axis: dict, deg: float) -> int:
     return int(min(max(round(axis["center"] + deg * axis["us_per_deg"]), 500), 2500))
 
 
+DEFAULT_AIM = {"pan_offset": 0.0, "pan_scale": 1.0, "tilt_offset": 0.0, "tilt_scale": 1.0}
+
+
+def apply_aim(eye: dict, pan: float, tilt: float) -> tuple[float, float]:
+    """PC-side aim correction (from calibrate-by-pointing): absorbs camera/eye pose errors
+    so the eye's own servo calibration can stay purely mechanical."""
+    a = {**DEFAULT_AIM, **(eye.get("aim") or {})}
+    return a["pan_offset"] + a["pan_scale"] * pan, a["tilt_offset"] + a["tilt_scale"] * tilt
+
+
+def aimed_angles(eye: dict, target_xy, look_height: float) -> tuple[float, float]:
+    """Angles to send to the eye: geometry plus the eye's aim correction."""
+    return apply_aim(eye, *eye_angles(eye, target_xy, look_height))
+
+
 def eye_angles(eye: dict, target_xy, look_height: float) -> tuple[float, float]:
     """Pan/tilt in the eye's own frame (+pan right, +tilt up), degrees."""
     ex, ey, ez = eye["position"]

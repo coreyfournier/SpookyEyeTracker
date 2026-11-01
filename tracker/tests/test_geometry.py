@@ -3,7 +3,7 @@ import math
 import numpy as np
 import pytest
 
-from eyetracker.geometry import CameraModel, _basis, eye_angles, servo_us, triangulate
+from eyetracker.geometry import CameraModel, _basis, aimed_angles, apply_aim, eye_angles, servo_us, triangulate
 
 CAM_LEFT = {"position": [-6.0, 0.0, 3.0], "heading": 40.0, "pitch": -15.0, "roll": 0.0, "hfov": 90.0}
 CAM_RIGHT = {"position": [6.0, 0.0, 3.0], "heading": -40.0, "pitch": -15.0, "roll": 0.0, "hfov": 90.0}
@@ -94,3 +94,14 @@ def test_servo_us_maps_and_clamps():
     assert servo_us(axis, 10) == 1800
     assert servo_us(axis, 50) == 2100                        # clamped to +20 deg
     assert servo_us(dict(axis, us_per_deg=-30), 10) == 1200  # reversed servo
+
+
+def test_apply_aim_defaults_to_identity():
+    assert apply_aim({}, 12.0, -3.0) == (12.0, -3.0)
+    eye = {"aim": {"pan_offset": 2.0, "pan_scale": 0.5}}       # missing keys use defaults
+    assert apply_aim(eye, 10.0, -3.0) == (7.0, -3.0)
+
+
+def test_aimed_angles_adds_correction():
+    eye = {"position": [0, 0, 1.2], "heading": 0, "pitch": 0, "aim": {"tilt_offset": 4.0}}
+    assert aimed_angles(eye, (0, 10), 1.2) == pytest.approx((0, 4.0))

@@ -37,6 +37,7 @@ def app(store):
     client = TestClient(create_app(store, world, link, Director(store, world, link), cameras,
                                    Calibrator(store, world)))
     client.link = link
+    client.app_world = world
     return client
 
 
@@ -83,10 +84,22 @@ def test_unknown_eye_404(app):
 
 
 def test_calibration_capture_needs_person(app):
-    r = app.post("/api/calib/eye1/capture", json={"pan_us": 1500, "tilt_us": 1500})
+    r = app.post("/api/calib/eye1/capture", json={"pan": 0, "tilt": 0})
     assert r.status_code == 409
     state = app.get("/api/calib/eye1").json()
     assert state["target"] is None and state["samples"] == []
+    assert state["aim"]["pan_scale"] == 1.0 and state["limits"]["pan"] == [-25.0, 25.0]
+
+
+def test_calibration_apply_saves_aim_without_pushing(app, store):
+    from eyetracker.world import Person
+    app.app_world.people = lambda max_age=None: [Person(1, 0, 6, 0, 0, face_h=1.6)]
+    assert app.post("/api/calib/eye1/capture", json={"pan": 3, "tilt": -1}).status_code == 200
+    r = app.post("/api/calib/eye1/apply").json()
+    assert r["saved"] and r["aim"]["pan_offset"] == pytest.approx(3, abs=0.01)
+    assert store.eye("eye1")["aim"]["pan_offset"] == pytest.approx(3, abs=0.01)
+    assert app.link.pushed == []                       # aim lives on the PC only
+    assert app.post("/api/calib/eye1/reset").json()["aim"]["pan_offset"] == 0.0
 
 
 def test_settings_save(app, store):
