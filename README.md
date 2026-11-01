@@ -103,6 +103,49 @@ and pushes the result.
 | `Dockerfile`, `docker-compose*.yml` | Container image for the tracker |
 | `.github/workflows/ci.yml` | Tests, firmware compile, Docker build + push |
 
+## Shopping list
+
+Per eye, unless noted. Screw and pin sizes come from the hole sizes in `cad/build.py`.
+Lengths are approximate, so check against your prints.
+
+**Electronics**
+
+| Qty | Part | Notes |
+|----:|------|-------|
+| 1 | [HiLetgo ESP32 OLED WiFi Kit](https://www.amazon.com/dp/B07DKD79Y9) | Classic ESP32 + 0.96" OLED. Firmware target `heltec_wifi_kit_32_v2` |
+| 1 | [WS2812B 7-LED RGB ring ("jewel")](https://www.amazon.com/dp/B0B2D6JDVJ) | One ring per eye; the pack has 7, enough for 7 eyes. Lights the iris |
+| 4 | SG90 micro servo (9 g) | Pan, tilt, upper lid, lower lid. MG90S (metal gear) is a drop-in upgrade |
+| 1 | 5 V power supply, **3 A or more** | Powers the servos + LEDs. Four servos can stall at over 2 A, so don't use the ESP32's USB 5 V |
+| 1 | DC barrel jack / screw-terminal adapter | To match the supply's plug |
+| 1 | 1000 µF electrolytic capacitor, 10 V+ | Across 5 V/GND near the servos |
+| 1 | 330 Ω resistor | In series with the LED data line (GPIO 13) |
+| — | Jumper wires / 22 AWG hookup wire | Servo leads to GPIO 26/27/32/33, shared ground. See [docs/WIRING.md](docs/WIRING.md) |
+| 1 | USB-C data cable | Flashing and serial monitor |
+| *opt.* | 74AHCT125 level shifter | Only if the LED colors glitch with 3.3 V data |
+
+**Hardware**
+
+| Qty | Part | Used for |
+|----:|------|----------|
+| 2 | 3 mm dowel pin, ~15 mm | Eye pitch pivots (press-fit through the eye's side bosses into the yoke) |
+| 1 | 3 mm dowel pin or M3 bolt, ~20 mm | Pan pivot through the stalk and yoke hub |
+| 2 | M3 × 25-30 mm screws | Stalk (16 mm thick) to the frame pedestal (self-tapping into the printed holes) |
+| 2 | M3 × 12 mm screws | Eyelid pivots: through each frame upright (self-tapping) into the lid's pivot hole |
+| 2 | M2 × 6 mm screws | LED jewel to the LED insert |
+| 4 | ~1.5 mm steel wire pushrods (or servo linkage kit) | Servo horns to the eye/lid tabs (2.2 mm holes). Z-bend the ends |
+| 4 | M4 screws | Optional: mount the frame base |
+
+**Printing**
+
+| Part | Filament |
+|------|----------|
+| `eye_front.stl` | White or translucent **regular** PLA, so the iris glows (matte PLA blocks most light) |
+| Everything else | Any PLA. Matte is fine |
+
+**Tracker (one per installation)**
+- 1-2 RTSP cameras (built for Hikvision; any camera with the same RTSP URL format works).
+- A PC or server to run it. An NVIDIA GPU runs detection at full camera frame rate; CPU-only works, but slower.
+
 ## 1. Configure
 
 1. Copy `.env.example` to `.env` and fill in the camera username, password and IPs.
