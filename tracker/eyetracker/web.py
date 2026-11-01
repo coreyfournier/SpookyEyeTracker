@@ -19,8 +19,9 @@ SETTINGS_SECTIONS = ("world", "tracking", "director", "detection")
 IDENTIFY_PALETTE = ([0, 255, 255], [255, 0, 255], [255, 200, 0], [0, 255, 0], [0, 60, 255], [255, 255, 255])
 
 
-def create_app(store, world, link, director, cameras, calib) -> FastAPI:
-    """cameras is a CameraManager (it may be inactive when run with --no-cameras)."""
+def create_app(store, world, link, director, cameras, calib, camcal=None) -> FastAPI:
+    """cameras is a CameraManager (it may be inactive when run with --no-cameras);
+    camcal is the CameraCalibration wizard."""
     app = FastAPI(title="Animatronic Eye Tracker")
 
     @app.exception_handler(ConfigError)
@@ -47,6 +48,10 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
     @app.get("/calibrate")
     def calibrate_page():
         return FileResponse(STATIC / "calibrate.html")
+
+    @app.get("/camcal")
+    def camcal_page():
+        return FileResponse(STATIC / "camcal.html")
 
     @app.get("/api/config")
     def get_config():
@@ -171,6 +176,44 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
     def calib_reset(eye_id: str):
         eye_or_404(eye_id)
         return {"saved": True, "aim": calib.reset(eye_id)["aim"]}
+
+    # ---------- camera calibration wizard ----------
+    def wizard():
+        if camcal is None:
+            raise HTTPException(404, "camera calibration isn't available")
+        return camcal
+
+    @app.get("/api/camcal")
+    def camcal_status():
+        return wizard().status()
+
+    @app.post("/api/camcal/start")
+    def camcal_start(body: dict = Body(...)):
+        if not cameras.active:
+            raise HTTPException(409, "cameras are off (tracker started with --no-cameras)")
+        if not cameras.workers:
+            raise HTTPException(409, "no cameras are running")
+        anchor = body.get("anchor")
+        try:
+            wizard().start(float(body["height"]), anchor if anchor else None)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        return wizard().status()
+
+    @app.post("/api/camcal/{action}")
+    def camcal_action(action: str):
+        w = wizard()
+        actions = {"skip": w.skip, "redo": w.redo, "more": w.more, "cancel": w.cancel,
+                   "solve": w.solve, "apply": w.apply, "undo": w.undo}
+        if action not in actions:
+            raise HTTPException(404, f"unknown action {action}")
+        try:
+            actions[action]()
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+        if action in ("apply", "undo"):
+            cameras.sync()
+        return w.status()
 
     # ---------- cameras & settings ----------
     @app.post("/api/cameras")

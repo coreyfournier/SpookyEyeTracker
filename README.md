@@ -51,7 +51,8 @@ People seen by both cameras are fused into a single person, and their face is
 triangulated for an exact height. **This screenshot shows why calibration matters.** The
 cameras are still at their guessed positions, so the same person appears as two (#1 and
 #3) about 3 m apart, and the left camera reads their eye level as 2.04 m. Once the camera
-poses are corrected (step 4 below), those collapse into one person at the right height.
+poses are corrected (the camera calibration wizard, step 4 below), those collapse into one
+person at the right height.
 Click anywhere on the map to make the eye look at that spot.
 
 ### 3. Each eye is configured and pushed from the UI
@@ -258,10 +259,29 @@ config, and with `director.auto_push` the tracker re-sends it automatically.
 
 ## 4. Calibrate
 
-**Cameras.** The camera poses in the config are a first guess. Open **Live**: each camera
-view draws a 2 m ground grid, a ★ where the eye should be, and a yellow dot on each
-detected face. Adjust `position`/`heading`/`pitch` on the **Cameras** tab until the grid
-lies flat on the lawn. Stand at a measured spot and check the yard map puts you there.
+**Cameras (do this first).** The camera poses in the config are a first guess. Rather than
+tuning them by hand, open `/camcal` on your phone (**Calibrate cameras** in the main UI)
+and let the wizard walk you through it. Have the yard to yourself.
+
+1. Enter your height, and mark a **center spot** both cameras can see. Measuring how far
+   it is from the window (out toward the street, and to the side) is optional but
+   recommended: it ties the cameras to the eyes.
+2. Tap **Start** and pocket the phone. It reads out where to go: the center spot, left,
+   right, toward the street, toward the house, and one spot of your choice. At each one
+   it waits for you to stand still, records about 2 s (beep and buzz when it's got it),
+   then sends you to the next. Chips show which cameras can see you; **Skip spot** and
+   **Redo last** are there if a spot is out of view or someone walks past.
+3. Tap **Solve**. Knowing your eye height, the tracker works out every camera's position,
+   heading, pitch, roll and field of view, plus where you stood. It shows how far apart
+   the cameras placed you before and after, how far off your measured height was, and a
+   map of the old and new camera poses.
+4. **Apply** saves the new poses (it takes effect immediately). **Undo last calibration**
+   on the start screen puts the previous ones back.
+
+Then redo the eye aim calibration below, since it was made with the old camera poses.
+To check or fine-tune by hand: each camera view on **Live** draws a 2 m ground grid, a ★
+where the eye should be, and a yellow dot on each detected face, and the **Cameras** tab
+edits `position`/`heading`/`pitch` directly.
 
 Eye calibration has two layers, which change for different reasons:
 

@@ -65,6 +65,7 @@
     <button data-tab="cameras">Cameras</button>
     <button data-tab="settings">Settings</button>
   </nav>
+  <a href="/camcal" style="color:var(--accent)">Calibrate cameras ↗</a>
   <a href="/calibrate" style="color:var(--accent)">Calibrate by pointing ↗</a>
   <div id="chips"></div>
 </header>
@@ -76,7 +77,8 @@
         <select id="mapEye" title="Eye to point when clicking the map"></select></h2>
       <canvas id="map"></canvas>
       <div class="hint">Stand somewhere you can measure (e.g. 5 m out from the eye) and compare with the dot.
-        Adjust camera position/heading/pitch on the Cameras tab until the dot and the grid overlay line up.</div>
+        Adjust camera position/heading/pitch on the Cameras tab until the dot and the grid overlay line up, or let
+        <a href="/camcal">Calibrate cameras</a> (on your phone) walk you through it and work them out.</div>
     </div>
   </section>
   <section class="tab" id="tab-eyes"><div class="grid" id="eyes"></div></section>

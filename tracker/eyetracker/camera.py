@@ -81,6 +81,7 @@ class CameraWorker:
         self.detect_fps = 0.0
         self.size = (0, 0)
         self.detections: list[Detection] = []
+        self.det_seq = 0   # bumps with every processed frame (the calibration wizard polls it)
 
     # ---------- lifecycle ----------
     def start(self):
@@ -170,6 +171,7 @@ class CameraWorker:
                                           (loc.ray_o, loc.ray_d)))
             self.world.update(self.cam_id, dets, time.time())
             self.detections = dets
+            self.det_seq += 1
             self._publish_preview(frame, dets, cam_model, cfg)
 
             n += 1

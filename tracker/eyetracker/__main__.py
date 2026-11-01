@@ -12,6 +12,7 @@ import threading
 import uvicorn
 
 from .calib import Calibrator
+from .camcal import CameraCalibration
 from .camera import CameraManager
 from .config import DEFAULT_CONFIG, ConfigStore, ensure_config
 from .director import Director
@@ -53,9 +54,12 @@ def main():
     cameras.sync()
     log.info("cameras: %s", ", ".join(cameras.workers) or "none")
 
+    camcal = CameraCalibration(store, cameras)
+    camcal.start_polling()
+
     web = store.section("web")
-    log.info("UI: http://localhost:%s  (phone calibration: /calibrate)", web["port"])
-    app = create_app(store, world, link, director, cameras, Calibrator(store, world))
+    log.info("UI: http://localhost:%s  (phone: /calibrate, /camcal)", web["port"])
+    app = create_app(store, world, link, director, cameras, Calibrator(store, world), camcal)
     uvicorn.run(app, host=web["host"], port=web["port"], log_level="warning")
 
 
