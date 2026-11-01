@@ -125,3 +125,67 @@ const FIELD_HELP = L => ({
   'eye:firmware.behaviors.lids.follow_gaze': 'Lids move with the eye like a real one: looking up opens them a little, looking down lowers them.',
   'eye:firmware.behaviors.lids.idle_open': 'How open the lids are while idling: 0 = shut, 1 = wide open. Below 1 looks relaxed; tracking always opens wide.',
 });
+
+// Allowed range of numeric fields, [min, max, step]: the UI's inputs use it and Save refuses
+// values outside it. Same keys as FIELD_HELP. Lengths are in metres (converted for display).
+// Fields not listed here are unrestricted.
+const FIELD_LIMITS = {
+  // ---------------- tracking settings ----------------
+  'settings:world.look_height': [0.3, 2.5],
+  'settings:tracking.merge_distance': [0.1, 5],
+  'settings:tracking.max_age': [0.1, 10],
+  'settings:tracking.smoothing': [0.01, 1],
+  'settings:tracking.height_smoothing': [0.01, 1],
+  'settings:director.switch_margin': [0, 10],
+  'settings:director.max_pan': [0, 90],
+  'settings:director.rate_hz': [1, 50, 1],
+  'settings:detection.confidence': [0.05, 0.95],
+  'settings:detection.imgsz': [320, 1920, 32],
+
+  // ---------------- cameras ----------------
+  'camera:rtsp_port': [1, 65535, 1],
+  'camera:channel': [1, 9999, 1],
+  'camera:heading': [-180, 180],
+  'camera:pitch': [-90, 90],
+  'camera:roll': [-45, 45],
+  'camera:hfov': [20, 180],
+
+  // ---------------- eyes ----------------
+  'eye:port': [1, 65535, 1],
+  'eye:heading': [-180, 180],
+  'eye:pitch': [-90, 90],
+  'eye:aim.pan_offset': [-45, 45],
+  'eye:aim.pan_scale': [0.2, 3],
+  'eye:aim.tilt_offset': [-45, 45],
+  'eye:aim.tilt_scale': [0.2, 3],
+  'eye:firmware.servos.pan.center': [500, 2500, 1],
+  'eye:firmware.servos.pan.us_per_deg': [-50, 50],
+  'eye:firmware.servos.pan.min': [-90, 0],
+  'eye:firmware.servos.pan.max': [0, 90],
+  'eye:firmware.servos.tilt.center': [500, 2500, 1],
+  'eye:firmware.servos.tilt.us_per_deg': [-50, 50],
+  'eye:firmware.servos.tilt.min': [-90, 0],
+  'eye:firmware.servos.tilt.max': [0, 90],
+  'eye:firmware.servos.lid_upper.open': [500, 2500, 1],
+  'eye:firmware.servos.lid_upper.closed': [500, 2500, 1],
+  'eye:firmware.servos.lid_lower.open': [500, 2500, 1],
+  'eye:firmware.servos.lid_lower.closed': [500, 2500, 1],
+  'eye:firmware.motion.max_speed': [10, 2000],
+  'eye:firmware.motion.smoothing': [0, 2],
+  'eye:firmware.motion.track_hold': [0, 30],
+  'eye:firmware.behaviors.blink.min_s': [0.5, 60],
+  'eye:firmware.behaviors.blink.max_s': [0.5, 60],
+  'eye:firmware.behaviors.blink.duration_ms': [50, 1000, 1],
+  'eye:firmware.behaviors.blink.double_chance': [0, 1],
+  'eye:firmware.behaviors.wander.min_s': [0.2, 60],
+  'eye:firmware.behaviors.wander.max_s': [0.2, 60],
+  'eye:firmware.behaviors.wander.range_pan': [0, 45],
+  'eye:firmware.behaviors.wander.range_tilt': [0, 30],
+  'eye:firmware.behaviors.iris.brightness': [0, 255, 1],
+  'eye:firmware.behaviors.iris.sclera_brightness': [0, 255, 1],
+  'eye:firmware.behaviors.spooky.flicker': [0, 1],
+  'eye:firmware.behaviors.spooky.pulse_hz': [0.05, 5],
+  'eye:firmware.behaviors.sleep.after_s': [5, 3600],
+  'eye:firmware.behaviors.sleep.lid': [0, 1],
+  'eye:firmware.behaviors.lids.idle_open': [0, 1],
+};

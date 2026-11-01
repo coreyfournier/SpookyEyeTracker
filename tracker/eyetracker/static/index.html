@@ -47,6 +47,7 @@
   input[type=number], input[type=text], select { background: var(--bg); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 4px 6px; font: inherit; width: 90px; }
   input[type=text] { width: 180px; }
+  input[type=number]:invalid { border-color: #e5484d; }
   input[type=color] { width: 44px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
   .vec { display: flex; gap: 4px; } .vec input { width: 70px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
@@ -147,6 +148,26 @@ function helpFor(scope, id) {
   const text = scope && FIELD_HELP(m => Units.len(m))[`${scope}:${id.replace(/^\d+\./, '')}`];
   return text && text.replace(/\s+/g, ' ');
 }
+// Allowed range for "<scope>:<path>" (help.js FIELD_LIMITS): sets the input's min/max/step and
+// shows the range next to the label. Lengths convert to the display units.
+function applyLimits(scope, id, input, label, isLen) {
+  const lim = scope && FIELD_LIMITS[`${scope}:${id.replace(/^\d+\./, '')}`];
+  if (!lim) return;
+  const [lo, hi, step] = lim.map(v => isLen ? Units.input(v, Units.imperial ? 1 : 2) : v);
+  Object.assign(input, {min: lo, max: hi});
+  if (step) input.step = step;
+  input.dataset.name = id.split('.').slice(-2).join(' ').replace(/_/g, ' ');
+  label.querySelector('small')?.remove();   // the unit is part of the range
+  label.insertAdjacentHTML('beforeend', ` <small>(${lo}–${hi}${isLen ? ' ' + Units.unit : ''})</small>`);
+}
+// Refuse a value outside its input's min/max (typed numbers aren't limited by the browser).
+function checkRange(el) {
+  const v = parseFloat(el.value);
+  if (el.min === '' && el.max === '') return;
+  if (Number.isNaN(v) || v < +el.min || v > +el.max)
+    throw new Error(`${el.dataset.name} must be between ${el.min} and ${el.max}`);
+}
+
 function infoButton(text, box) {
   const b = Object.assign(document.createElement('button'), {type: 'button', className: 'info', textContent: 'i',
     title: 'What is this?'});
@@ -199,8 +220,10 @@ function buildForm(obj, path = [], skip = new Set(), scope = '') {
     } else if (typeof v === 'number' && isLen) {
       input = lengthInput(v);
       input.dataset.kind = 'len';
+      applyLimits(scope, id, input, $('label', row), true);
     } else if (typeof v === 'number') {
       input = Object.assign(document.createElement('input'), {type: 'number', step: 'any', value: v});
+      applyLimits(scope, id, input, $('label', row), false);
     } else {
       input = Object.assign(document.createElement('input'), {type: 'text', value: v ?? ''});
     }
@@ -224,8 +247,8 @@ function readForm(root, base) {
     else if (el.dataset.kind === 'color') o[k] = fromHex(el.value);
     else if (el.dataset.kind === 'vec') o[k] = [...el.querySelectorAll('input')].map(i => parseFloat(i.value));
     else if (el.dataset.kind === 'lenvec') o[k] = [...el.querySelectorAll('input')].map((i, n) => readLength(i, old[n]));
-    else if (el.dataset.kind === 'len') o[k] = readLength(el, old);
-    else if (typeof old === 'number') o[k] = parseFloat(el.value);
+    else if (el.dataset.kind === 'len') { checkRange(el); o[k] = readLength(el, old); }
+    else if (typeof old === 'number') { checkRange(el); o[k] = parseFloat(el.value); }
     else o[k] = el.value;
   });
   return out;
