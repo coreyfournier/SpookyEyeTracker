@@ -83,7 +83,7 @@ def test_status_goes_online_and_in_sync(linked):
     assert wait_for(lambda: link.status(eye)["online"])
     assert wait_for(lambda: link.status(eye)["config_in_sync"])
     assert link.status(eye)["activity"] == "wander"
-    assert link.status(eye)["fw"] == {"version": "abc1234", "built": "2026-11-01", "board": "featheresp32"}
+    assert link.status(eye)["fw"] == {"version": "abc1234", "built": "2026-11-01", "board": "featheresp32", "ota": False}
 
 
 def test_push_without_ack_fails(store):

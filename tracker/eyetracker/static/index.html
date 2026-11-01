@@ -194,6 +194,8 @@ function eyeCard(eye) {
     <div class="row">
       <button class="btn primary" data-savepush>Save &amp; Push</button>
       <button class="btn" data-push title="Re-send the saved config (e.g. if the last push did not reach the eye)">Push</button>
+      <button class="btn" data-fwbtn title="Upload a firmware.bin over WiFi (firmware/.pio/build/${eye.id}/firmware.bin)">Update firmware…</button>
+      <input type="file" accept=".bin" data-fwfile hidden>
       <span class="msg" data-msg></span>
     </div>`;
   const form = $('[data-form]', card);
@@ -244,7 +246,7 @@ function eyeCard(eye) {
   };
   $('[data-release]', card).onclick = () => api(`/api/eyes/${eye.id}/release`, {});
 
-  const setBusy = b => card.querySelectorAll('[data-savepush],[data-push]').forEach(x => x.disabled = b);
+  const setBusy = b => card.querySelectorAll('[data-savepush],[data-push],[data-fwbtn]').forEach(x => x.disabled = b);
   $('[data-savepush]', card).onclick = async () => {
     setBusy(true); msg.textContent = 'Saving…';
     try {
@@ -261,6 +263,21 @@ function eyeCard(eye) {
       const r = await api(`/api/eyes/${eye.id}/push`, {});
       msg.textContent = (r.pushed ? 'Pushed ✓' : 'No acknowledgement from eye') + (dirty ? ' (unsaved form changes were not sent)' : '');
     } catch (e) { msg.textContent = 'Error: ' + e.message; }
+    setBusy(false);
+  };
+  const fwFile = $('[data-fwfile]', card);
+  $('[data-fwbtn]', card).onclick = () => fwFile.click();
+  fwFile.onchange = async () => {
+    const file = fwFile.files[0];
+    fwFile.value = '';
+    if (!file || !confirm(`Flash ${file.name} to ${eye.name || eye.id} over WiFi? The eye reboots when it's done.`)) return;
+    setBusy(true); msg.textContent = `Uploading ${Math.round(file.size / 1024)} KB… (the eye holds still, then reboots)`;
+    try {
+      const r = await fetch(`/api/eyes/${eye.id}/firmware`, {method: 'POST', body: file,
+        headers: {'Content-Type': 'application/octet-stream'}});
+      const j = await r.json();
+      msg.textContent = r.ok ? `Firmware sent ✓ — ${eye.id} is rebooting` : 'Update failed: ' + j.detail;
+    } catch (e) { msg.textContent = 'Update failed: ' + e.message; }
     setBusy(false);
   };
   card.isDirty = () => dirty;

@@ -18,7 +18,7 @@ class FakeLink:
 
     def status(self, eye):
         return {"online": True, "state": "idle", "config_in_sync": True,
-                "fw": {"version": "1111111", "built": "2026-11-01", "board": "featheresp32"}}
+                "fw": {"version": "1111111", "built": "2026-11-01", "board": "featheresp32", "ota": True}}
 
     def manual(self, eye, **kw):
         self.manuals.append(kw)
@@ -114,3 +114,14 @@ def test_calibration_apply_saves_aim_without_pushing(app, store):
 def test_settings_save(app, store):
     r = app.post("/api/settings/save", json={"director": dict(store.section("director"), strategy="spread")})
     assert r.status_code == 200 and store.section("director")["strategy"] == "spread"
+
+
+def test_firmware_upload_checks_board_before_sending(app):
+    heltec = bytes([0xE9]) + b"heltec_wifi_kit_32_v2\0" + b"x" * 100
+    r = app.post("/api/eyes/eye1/firmware", content=heltec)
+    assert r.status_code == 409 and "featheresp32" in r.json()["detail"]   # the fake eye reports a Feather
+
+
+def test_firmware_upload_rejects_non_firmware(app):
+    r = app.post("/api/eyes/eye1/firmware", content=b"definitely not firmware")
+    assert r.status_code == 400 and "not an ESP32 firmware image" in r.json()["detail"]

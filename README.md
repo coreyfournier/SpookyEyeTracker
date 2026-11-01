@@ -222,6 +222,22 @@ pio run -e eye2 -t upload        # Adafruit HUZZAH32 Feather
 pio device monitor
 ```
 
+**Over-the-air updates.** After the first USB flash, update an eye over WiFi:
+
+```powershell
+pio run -e eye1_ota -t upload    # builds eye1 and uploads it; IP comes from the running tracker
+pio run -e eye2_ota -t upload --upload-port 192.168.2.144    # or give the IP yourself
+```
+
+You can also use **Update firmware…** on an eye's card in the web UI and pick
+`firmware/.pio/build/<eye>/firmware.bin`. The eye holds still while the update is written,
+shows `UPDATING n%` (the Feather's LED flickers), then reboots into the new firmware. Its
+firmware badge in the UI turns green once it's current.
+
+OTA is protected by `EYE_OTA_PASSWORD` in `.env`. It's baked into the firmware at build time
+and used for each upload, so builds without it have no update endpoint. The eye rejects an
+image built for the other board type, since the pins differ.
+
 Each `[env:eyeN]` in `platformio.ini` is one physical eye. It builds on a board section
 (`[heltec]` or `[feather]`) and sets `EYE_NAME`. To add another eye, copy an env, give it the
 next name, and add a matching entry under `eyes:` in the tracker config.

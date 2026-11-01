@@ -9,7 +9,7 @@
 //
 // Status output depends on the board (see platformio.ini):
 //   HAS_OLED        - built-in 128x64 OLED shows activity, IP, signal, pan/tilt
-//   PIN_STATUS_LED  - single LED: fast blink = no WiFi, short blip = waiting for the PC,
+//   PIN_STATUS_LED  - single LED: flicker = updating firmware, fast blink = no WiFi, short blip = waiting for the PC,
 //                     double blip = idle/wander/sleep, solid = tracking, 2 Hz = manual
 // Activity changes are always logged to the serial monitor.
 #include <Arduino.h>
@@ -19,14 +19,8 @@
 #include "behavior.h"
 #include "eye_config.h"
 
-#ifndef EYE_NAME
-#define EYE_NAME "eye"
-#endif
-#ifndef FW_VERSION  // normally set by scripts/version.py
-#define FW_VERSION "unknown"
-#define FW_BUILT ""
-#define FW_BOARD ""
-#endif
+#include "build_info.h"
+#include "ota.h"
 
 #if HAS_OLED
 #include <U8g2lib.h>
@@ -79,6 +73,7 @@ static void sendStatus() {
   doc["fw"] = FW_VERSION;
   doc["built"] = FW_BUILT;
   doc["board"] = FW_BOARD;
+  doc["ota"] = otaEnabled();
   reply(doc);
 }
 
@@ -126,6 +121,16 @@ static void handlePacket(int len) {
 static void drawStatus() {
   char line[32];
   oled.clearBuffer();
+  if (otaActive()) {
+    oled.setFont(u8g2_font_helvB14_tr);
+    oled.drawStr(0, 18, "UPDATING");
+    snprintf(line, sizeof(line), "%d%%", otaProgress());
+    oled.drawStr(0, 44, line);
+    oled.setFont(u8g2_font_6x10_tf);
+    oled.drawStr(0, 62, "don't unplug");
+    oled.sendBuffer();
+    return;
+  }
 
   // Line 1: what the eye is doing right now, large, with the eye's name on the right.
   char act[12];
@@ -164,7 +169,9 @@ static void drawStatus() {
   bool pcOk = lastPacketMs && t - lastPacketMs < 3000;
   const char *act = behaviorActivity();
   bool on;
-  if (WiFi.status() != WL_CONNECTED) {
+  if (otaActive()) {
+    on = (t / 50) % 2;                                     // very fast flicker: updating firmware
+  } else if (WiFi.status() != WL_CONNECTED) {
     on = (t / 125) % 2;                                    // fast blink: no WiFi
   } else if (!pcOk) {
     on = t % 2000 < 80;                                    // short blip: waiting for the PC
@@ -212,6 +219,11 @@ void setup() {
 
 void loop() {
   int len;
+  otaHandle();
+  if (otaActive()) {        // hold still while new firmware is written; the eye reboots after
+    drawStatus();
+    return;
+  }
   while ((len = udp.parsePacket()) > 0) handlePacket(len);
   behaviorUpdate();
   const char *act = behaviorActivity();

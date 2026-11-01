@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .config import MAX_CAMERAS, ConfigError
 from .geometry import DEFAULT_AIM
+from .ota import OtaError, detect_board, ota_password, upload as ota_upload
 from .version import firmware_status, latest_firmware_version
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -88,6 +89,21 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
     def release(eye_id: str):
         link.release(eye_or_404(eye_id))
         return {"ok": True}
+
+    @app.post("/api/eyes/{eye_id}/firmware")
+    async def update_firmware(eye_id: str, request: Request):
+        """Body: the raw firmware.bin. Forwarded to the eye's OTA endpoint; the eye reboots."""
+        eye = eye_or_404(eye_id)
+        image = await request.body()
+        try:
+            board = detect_board(image)
+            running = link.status(eye).get("fw", {}).get("board")
+            if running and running != board:
+                raise HTTPException(409, f"that firmware is for {board}, but {eye_id} is a {running}")
+            reply = await asyncio.to_thread(ota_upload, eye["ip"], image, ota_password())
+        except OtaError as exc:
+            raise HTTPException(400, str(exc))
+        return {"ok": True, "board": board, "eye": reply}
 
     @app.post("/api/eyes/{eye_id}/look_at")
     def look_at(eye_id: str, body: dict = Body(...)):
