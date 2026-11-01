@@ -111,7 +111,9 @@ const FIELD_HELP = L => ({
   'eye:firmware.behaviors.iris.track': 'Iris colour while watching someone.',
   'eye:firmware.behaviors.iris.sleep': 'Iris colour while asleep (it also slowly breathes).',
   'eye:firmware.behaviors.iris.sclera': 'Colour of the white of the eye (the 6 outer LEDs). A warm, dim off-white looks most natural.',
-  'eye:firmware.behaviors.iris.brightness': 'Overall LED brightness, 0–255.',
+  'eye:firmware.behaviors.iris.brightness': 'Brightness of the iris (the centre LED), 0–255.',
+  'eye:firmware.behaviors.iris.sclera_brightness': `Brightness of the white of the eye (the 6 outer LEDs), 0–255.
+    Lower it to make the iris stand out more.`,
   'eye:firmware.behaviors.spooky': 'Halloween mode: flickering, pulsing light, and a jump-scare when someone appears.',
   'eye:firmware.behaviors.spooky.flicker': 'How often the light flickers and dips, 0–1. 0 = never.',
   'eye:firmware.behaviors.spooky.pulse_hz': 'Speed of the slow glow pulse, in pulses per second.',

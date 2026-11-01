@@ -59,6 +59,7 @@ void configFromJson(JsonObjectConst o, EyeConfig &c) {
   readRgb(iris["sleep"], c.irisSleep);
   readRgb(iris["sclera"], c.sclera);
   c.brightness = iris["brightness"] | c.brightness;
+  c.scleraBrightness = iris["sclera_brightness"] | c.scleraBrightness;
 
   JsonObjectConst sp = b["spooky"];
   c.spookyEnabled = sp["enabled"] | c.spookyEnabled;

@@ -53,6 +53,18 @@ def test_invalid_file_fails_to_load(tmp_path, cfg_dict):
         ConfigStore(path)
 
 
+def test_old_config_gets_sclera_brightness_from_brightness(tmp_path, cfg_dict):
+    iris = cfg_dict["eyes"][0]["firmware"]["behaviors"]["iris"]
+    del iris["sclera_brightness"]
+    iris["brightness"] = 187
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(cfg_dict, sort_keys=False))
+    iris = ConfigStore(path).eye(cfg_dict["eyes"][0]["id"])["firmware"]["behaviors"]["iris"]
+    assert iris["sclera_brightness"] == 187        # looks the same as before the split
+    keys = list(iris)
+    assert keys.index("sclera_brightness") == keys.index("brightness") + 1
+
+
 def test_save_roundtrip_and_remove(store):
     eye = store.eye("eye1")
     eye["name"] = "Porch"

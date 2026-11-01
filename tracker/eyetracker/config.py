@@ -71,6 +71,19 @@ def validate(cfg: dict) -> list[str]:
     return errors
 
 
+def _upgrade_eye(eye: dict) -> None:
+    """Fill in settings added since an older config was written."""
+    iris = (((eye.get("firmware") or {}).get("behaviors") or {}).get("iris"))
+    if isinstance(iris, dict) and "brightness" in iris and "sclera_brightness" not in iris:
+        # brightness used to cover all 7 LEDs; it now only sets the centre (iris) LED.
+        # Insert the ring's own setting right after it, at the same level.
+        items = list(iris.items())
+        i = [k for k, _ in items].index("brightness") + 1
+        items.insert(i, ("sclera_brightness", iris["brightness"]))
+        iris.clear()
+        iris.update(items)
+
+
 def ensure_config(path: Path) -> Path:
     """Copy the bundled default config to `path` on first run (e.g. an empty Docker volume)."""
     path = Path(path)
@@ -99,6 +112,8 @@ class ConfigStore:
             data = yaml.safe_load(f) or {}
         data.setdefault("cameras", [])
         data.setdefault("eyes", [])
+        for e in data["eyes"]:
+            _upgrade_eye(e)
         errors = validate(data)
         if errors:
             raise ConfigError(f"{self.path}: " + "; ".join(errors))

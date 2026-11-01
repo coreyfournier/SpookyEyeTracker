@@ -96,7 +96,8 @@ eyes:
         track: [255, 0, 0]
         sleep: [40, 0, 0]
         sclera: [90, 80, 60]     # white of the eye (ring LEDs); the centre LED shows the colours above
-        brightness: 160
+        brightness: 160          # centre LED (iris), 0-255
+        sclera_brightness: 160   # six ring LEDs (white of the eye), 0-255
       spooky: {enabled: false, flicker: 0.3, pulse_hz: 1.0, startle: true}
       sleep: {enabled: true, after_s: 60.0, lid: 0.0}
       lids: {follow_gaze: true, idle_open: 0.85}
@@ -126,7 +127,8 @@ eyes:
         track: [255, 0, 0]
         sleep: [40, 0, 0]
         sclera: [90, 80, 60]     # white of the eye (ring LEDs); the centre LED shows the colours above
-        brightness: 160
+        brightness: 160          # centre LED (iris), 0-255
+        sclera_brightness: 160   # six ring LEDs (white of the eye), 0-255
       spooky: {enabled: false, flicker: 0.3, pulse_hz: 1.0, startle: true}
       sleep: {enabled: true, after_s: 60.0, lid: 0.0}
       lids: {follow_gaze: true, idle_open: 0.85}

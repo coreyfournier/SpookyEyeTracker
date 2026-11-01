@@ -152,7 +152,7 @@ Each one is a setting on the eye's card in the tracker UI, and can be switched o
 | **Track** | Looks at the person the tracker picked, easing toward them (`motion.smoothing`) at up to `motion.max_speed`. Holds its gaze for `motion.track_hold` seconds after they disappear |
 | **Blink** | Random blinks every `min_s`-`max_s` seconds, sometimes a double blink |
 | **Wander** | With nobody around, glances to random spots within `range_pan`/`range_tilt` |
-| **Iris colour** | The centre LED (iris) shows a colour per state: idle, track, sleep. The six ring LEDs light the white of the eye in the `sclera` colour |
+| **Iris colour** | The centre LED (iris) shows a colour per state: idle, track, sleep. The six ring LEDs light the white of the eye in the `sclera` colour. `brightness` sets the iris and `sclera_brightness` the white, so you can make the iris stand out |
 | **Spooky** | Flickering, a slow glow pulse, and a startle (white flash, eyes wide) when someone new appears |
 | **Sleep** | After `after_s` seconds with nobody around, the eye droops, the lids close to `lid`, and the light breathes slowly |
 | **Lids** | `follow_gaze` moves the lids with the eye like a real one; `idle_open` sets how open they are while idling |

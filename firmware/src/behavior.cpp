@@ -155,10 +155,12 @@ static void updateLeds(uint32_t now) {
   }
 
   bool flash = now < startleUntil && (now + STARTLE_MS - startleUntil) < 150;
-  Rgb centre = flash ? Rgb{255, 255, 255} : scale(iris, level);
-  Rgb white = flash ? Rgb{255, 255, 255} : scale(cfg.sclera, level);
+  // the iris and the white have their own brightness, so scale each colour here rather than
+  // with the strip's single setBrightness()
+  Rgb centre = scale(flash ? Rgb{255, 255, 255} : scale(iris, level), cfg.brightness / 255.0f);
+  Rgb white = scale(flash ? Rgb{255, 255, 255} : scale(cfg.sclera, level), cfg.scleraBrightness / 255.0f);
 
-  leds.setBrightness(cfg.brightness);
+  leds.setBrightness(255);
   // Jewel: LED 0 is the centre - the LED insert's funnel carries it to the iris.
   // LEDs 1..6 are the ring, outside the funnel - they light the white of the eye.
   leds.setPixelColor(0, centre.r, centre.g, centre.b);

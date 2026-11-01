@@ -52,7 +52,8 @@ struct EyeConfig {
   Rgb irisTrack{255, 0, 0};
   Rgb irisSleep{40, 0, 0};
   Rgb sclera{90, 80, 60};  // white of the eye (the six ring LEDs)
-  uint8_t brightness = 160;
+  uint8_t brightness = 160;        // centre LED (iris)
+  uint8_t scleraBrightness = 160;  // six ring LEDs (white of the eye)
 
   // spooky mode
   bool spookyEnabled = false;
