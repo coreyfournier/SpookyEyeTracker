@@ -220,7 +220,10 @@ pio device monitor
 ```
 
 WiFi credentials come from the `ENV_WIFI_SSID` / `ENV_WIFI_PW` environment variables at
-build time. The serial log and OLED show the IP. The eye stores its last pushed config in
+build time. The serial log and OLED show the IP. The OLED's top line shows what the eye is doing right
+now (**TRACK**, **HOLD**, **STARTLE**, **WANDER**, **IDLE**, **SLEEP** or **MANUAL**). Below that are
+the IP, WiFi signal, time since the last PC packet, the current pan/tilt, and which optional
+behaviors are on. The web UI shows the same activity. The eye stores its last pushed config in
 flash. The UI shows *config differs* if it missed a push. **Push** re-sends the saved
 config, and with `director.auto_push` the tracker re-sends it automatically.
 

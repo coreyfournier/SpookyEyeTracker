@@ -186,7 +186,7 @@ function render() {
     $('#target').innerHTML = '<span class="dot bad"></span>Nobody detected';
     $('#targetSub').textContent = 'Step into view of a camera.';
   }
-  $('#eyeStat').innerHTML = e.online ? `<span class="dot ok"></span>Eye online · ${e.state} · ${e.rssi} dBm`
+  $('#eyeStat').innerHTML = e.online ? `<span class="dot ok"></span>Eye online · ${e.activity} · ${e.rssi} dBm`
     : '<span class="dot bad"></span>Eye offline';
   $('#capture').disabled = !t;
 

@@ -267,7 +267,7 @@ function eyeCard(eye) {
   card.updateStatus = st => {
     const s = $('[data-status]', card);
     s.innerHTML = !st || !st.online ? '<span class="dot bad"></span>offline'
-      : `<span class="dot ${st.config_in_sync ? 'ok' : 'warn'}"></span>${st.state} · ${st.config_in_sync ? 'config synced' : 'config differs'} · ${st.rssi} dBm`;
+      : `<span class="dot ${st.config_in_sync ? 'ok' : 'warn'}"></span>${st.activity} · ${st.config_in_sync ? 'config synced' : 'config differs'} · ${st.rssi} dBm`;
   };
   return card;
 }
@@ -441,7 +441,7 @@ async function poll() {
       if (el) el.textContent = c.connected ? `${c.size[0]}×${c.size[1]} · read ${c.read_fps} fps · detect ${c.detect_fps} fps · ${c.people} people` : 'connecting…';
     }
     for (const [id, st] of Object.entries(state.eyes)) {
-      chips.push(`<span class="chip"><span class="dot ${st.online ? (st.config_in_sync ? 'ok' : 'warn') : 'bad'}"></span>${id} ${st.online ? st.state : 'offline'}</span>`);
+      chips.push(`<span class="chip"><span class="dot ${st.online ? (st.config_in_sync ? 'ok' : 'warn') : 'bad'}"></span>${id} ${st.online ? st.activity : 'offline'}</span>`);
       eyeCards[id]?.updateStatus(st);
     }
     $('#chips').innerHTML = chips.join('');

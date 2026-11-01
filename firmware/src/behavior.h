@@ -24,5 +24,6 @@ void behaviorUpdate();  // call every loop; runs at ~50 Hz internally
 
 EyeState behaviorState();
 const char *behaviorStateName();
+const char *behaviorActivity();  // what the eye is doing right now: track, hold, wander, sleep, ...
 float behaviorPan();
 float behaviorTilt();

@@ -113,7 +113,9 @@ class EyeLink:
             st = dict(self._status.get(eye["id"], {}))
         online = bool(st) and time.time() - st["seen"] < OFFLINE_AFTER
         want = firmware_version(eye["firmware"])
-        return {"online": online, "state": st.get("state"), "pan": st.get("pan"), "tilt": st.get("tilt"),
+        return {"online": online, "state": st.get("state"),
+                "activity": st.get("act") or st.get("state"),   # track/hold/wander/sleep/... (older firmware: state)
+                "pan": st.get("pan"), "tilt": st.get("tilt"),
                 "rssi": st.get("rssi"), "uptime": st.get("up"),
                 "config_in_sync": online and st.get("ver") == want,
                 "last_look": self.last_look.get(eye["id"])}

@@ -56,6 +56,7 @@ static void sendStatus() {
   doc["id"] = EYE_NAME;
   doc["ver"] = cfg.ver;
   doc["state"] = behaviorStateName();
+  doc["act"] = behaviorActivity();
   doc["pan"] = roundf(behaviorPan() * 10) / 10;
   doc["tilt"] = roundf(behaviorTilt() * 10) / 10;
   doc["rssi"] = WiFi.RSSI();
@@ -106,26 +107,36 @@ static void handlePacket(int len) {
 static void drawOled() {
   char line[32];
   oled.clearBuffer();
+
+  // Line 1: what the eye is doing right now, large, with the eye's name on the right.
+  char act[12];
+  snprintf(act, sizeof(act), "%s", behaviorActivity());
+  for (char *c = act; *c; c++) *c = toupper(*c);
+  oled.setFont(u8g2_font_helvB14_tr);
+  oled.drawStr(0, 15, act);
   oled.setFont(u8g2_font_6x10_tf);
-  snprintf(line, sizeof(line), "%s  %s", EYE_NAME, behaviorStateName());
-  oled.drawStr(0, 10, line);
+  oled.drawStr(128 - oled.getStrWidth(EYE_NAME), 10, EYE_NAME);
+
   if (WiFi.status() == WL_CONNECTED) {
-    oled.drawStr(0, 22, WiFi.localIP().toString().c_str());
-    snprintf(line, sizeof(line), "rssi %d  udp:%d", WiFi.RSSI(), EYE_PORT);
+    oled.drawStr(0, 28, WiFi.localIP().toString().c_str());
+    if (lastPacketMs) {
+      snprintf(line, sizeof(line), "%d dBm  pc %.1fs ago", WiFi.RSSI(), (millis() - lastPacketMs) / 1000.0f);
+    } else {
+      snprintf(line, sizeof(line), "%d dBm  waiting for pc", WiFi.RSSI());
+    }
   } else {
-    oled.drawStr(0, 22, "WiFi connecting...");
-    snprintf(line, sizeof(line), "%.20s", WIFI_SSID);
+    oled.drawStr(0, 28, "WiFi connecting...");
+    snprintf(line, sizeof(line), "%.21s", WIFI_SSID);
   }
-  oled.drawStr(0, 34, line);
+  oled.drawStr(0, 40, line);
+
   snprintf(line, sizeof(line), "pan %+5.1f tilt %+5.1f", behaviorPan(), behaviorTilt());
-  oled.drawStr(0, 46, line);
-  if (lastPacketMs) {
-    snprintf(line, sizeof(line), "pc %.1fs ago cfg %04lx", (millis() - lastPacketMs) / 1000.0f,
-             (unsigned long)(cfg.ver & 0xffff));
-  } else {
-    snprintf(line, sizeof(line), "waiting for pc...");
-  }
-  oled.drawStr(0, 58, line);
+  oled.drawStr(0, 52, line);
+
+  // Bottom line: which optional behaviors are switched on.
+  snprintf(line, sizeof(line), "%s%s%s", cfg.blinkEnabled ? "blink " : "", cfg.wanderEnabled ? "wander " : "",
+           cfg.spookyEnabled ? "spooky" : "");
+  oled.drawStr(0, 63, line[0] ? line : "no behaviors on");
   oled.sendBuffer();
 }
 

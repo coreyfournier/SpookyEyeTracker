@@ -24,6 +24,7 @@ static uint32_t nextWanderMs = 0;
 static uint32_t startleUntil = 0;
 static uint32_t flickerUntil = 0;
 static float flickerLevel = 1.0f;
+static bool holding = false;               // tracking a person who just went out of view
 
 static float frand(float a, float b) { return a + (b - a) * (esp_random() / 4294967295.0f); }
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -155,6 +156,7 @@ void behaviorUpdate() {
   bool targetFresh = look.hasTarget && (now - look.atMs) < LOOK_STALE_MS;
   float lidBase;
 
+  holding = false;
   if (now < manual.untilMs) {
     state = EyeState::Manual;
     goalPan = manual.pan;
@@ -166,6 +168,7 @@ void behaviorUpdate() {
     goalTilt = look.tilt;
     lidBase = 1.0f;
   } else if (state == EyeState::Track && now - lastTargetMs < cfg.trackHold * 1000) {
+    holding = true;
     lidBase = 1.0f;  // hold gaze where the person was last seen
   } else if (cfg.sleepEnabled && now - lastTargetMs > cfg.sleepAfter * 1000) {
     state = EyeState::Sleep;
@@ -219,6 +222,17 @@ void behaviorUpdate() {
 EyeState behaviorState() { return state; }
 float behaviorPan() { return curPan; }
 float behaviorTilt() { return curTilt; }
+
+const char *behaviorActivity() {
+  switch (state) {
+    case EyeState::Manual: return "manual";
+    case EyeState::Sleep: return "sleep";
+    case EyeState::Track:
+      if (millis() < startleUntil) return "startle";
+      return holding ? "hold" : "track";
+    default: return cfg.wanderEnabled ? "wander" : "idle";
+  }
+}
 
 const char *behaviorStateName() {
   switch (state) {
