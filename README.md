@@ -22,6 +22,75 @@ eyes, each driven by an ESP32.
 Detection knows nothing about eyes, and eyes know nothing about cameras. To add an eye,
 flash another board and add an entry under `eyes:` in the config (or the UI).
 
+## How it works - a tour of the web UI
+
+The tracker serves a web UI on port 8080. These screenshots are from the real system on
+Halloween night, before calibration (the camera positions are still the first guesses).
+
+### 1. Each camera finds people
+
+![Both camera views with a detected person](docs/images/live-cameras.jpg)
+
+Each camera's stream runs through a YOLO pose model. The **red box** is a detected person,
+and the **yellow dot** is their eyes (from face keypoints, falling back to ears, shoulders,
+or 1/16 of the way down the box). The faint **grid** is the ground plane drawn every 2 m
+from the camera's configured pose. When the pose is right, the grid lies flat on the lawn,
+and that's how you check camera calibration. The label shows the person's estimated
+position in the yard and their measured eye-level height.
+
+### 2. Everyone is placed on a yard map
+
+![Top-down yard map with cameras, the eye, people and the gaze line](docs/images/yard-map.png)
+
+The **Live** tab's top-down map shows:
+- each camera (blue square and field-of-view wedge)
+- the eye (orange dot) and its current gaze (orange line)
+- every person the tracker knows about
+
+People seen by both cameras are fused into a single person, and their face is
+triangulated for an exact height. **This screenshot shows why calibration matters.** The
+cameras are still at their guessed positions, so the same person appears as two (#1 and
+#3) about 3 m apart, and the left camera reads their eye level as 2.04 m. Once the camera
+poses are corrected (step 4 below), those collapse into one person at the right height.
+Click anywhere on the map to make the eye look at that spot.
+
+### 3. Each eye is configured and pushed from the UI
+
+![Eye settings: servo calibration, behaviors and manual control](docs/images/eyes-tab.png)
+
+The **Eyes** tab has one card per eye:
+- **Settings:** servo centers and limits, motion smoothing, and each behavior, all
+  switchable (blink, idle wander, iris colors by state, spooky mode, sleep, lids following
+  the gaze).
+- **Manual-control sliders:** take over the servos to find their positions.
+- **Save & Push:** writes the config file and sends the settings to the ESP32 over UDP.
+- **Push:** re-sends the saved settings if the eye missed them. The status chip shows
+  whether the eye is online and its config is in sync.
+
+### 4. Cameras: 0, 1 or 2
+
+![Camera settings with add/remove](docs/images/cameras-tab.png)
+
+Each camera's address, stream and pose (position, heading, pitch, field of view) can be
+edited live. Cameras can be added or removed, up to two, without restarting.
+
+### 5. Calibrate an eye from your phone
+
+<img src="docs/images/calibrate-phone.png" alt="Phone calibration page" width="300" align="right">
+
+Open `/calibrate` on your phone and stand in the yard. The page shows who the cameras
+see, how far away they are, and their eye-level height.
+
+1. **Snap to me** points the eye where the tracker thinks you are.
+2. Use the arrows to nudge it until it's looking right at you, then tap **Capture this spot**.
+3. Repeat at 4-5 spots.
+
+The tracker fits each servo's center and scale (µs per degree) from those samples. This
+absorbs servo offsets, linkage ratios and camera-pose errors in one step. **Apply** saves
+and pushes the result.
+
+<br clear="right">
+
 ## Layout
 
 | Path | What |
