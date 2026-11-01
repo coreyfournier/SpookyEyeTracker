@@ -22,6 +22,11 @@
 #ifndef EYE_NAME
 #define EYE_NAME "eye"
 #endif
+#ifndef FW_VERSION  // normally set by scripts/version.py
+#define FW_VERSION "unknown"
+#define FW_BUILT ""
+#define FW_BOARD ""
+#endif
 
 #if HAS_OLED
 #include <U8g2lib.h>
@@ -71,6 +76,9 @@ static void sendStatus() {
   doc["tilt"] = roundf(behaviorTilt() * 10) / 10;
   doc["rssi"] = WiFi.RSSI();
   doc["up"] = millis() / 1000;
+  doc["fw"] = FW_VERSION;
+  doc["built"] = FW_BUILT;
+  doc["board"] = FW_BOARD;
   reply(doc);
 }
 
@@ -181,6 +189,15 @@ void setup() {
   digitalWrite(Vext, LOW);  // power the OLED
   delay(50);
   oled.begin();
+  oled.clearBuffer();  // boot splash: which firmware is this?
+  oled.setFont(u8g2_font_helvB14_tr);
+  oled.drawStr(0, 18, EYE_NAME);
+  oled.setFont(u8g2_font_6x10_tf);
+  oled.drawStr(0, 36, "fw " FW_VERSION);
+  oled.drawStr(0, 48, "built " FW_BUILT);
+  oled.drawStr(0, 60, FW_BOARD);
+  oled.sendBuffer();
+  delay(1500);
 #elif defined(PIN_STATUS_LED)
   pinMode(PIN_STATUS_LED, OUTPUT);
 #endif
@@ -189,7 +206,8 @@ void setup() {
   behaviorBegin();
   wifiBegin();
   udp.begin(EYE_PORT);
-  Serial.printf("eye '%s' listening on udp %d\n", EYE_NAME, EYE_PORT);
+  Serial.printf("eye '%s' fw %s (built %s, %s) listening on udp %d\n", EYE_NAME, FW_VERSION, FW_BUILT, FW_BOARD,
+                EYE_PORT);
 }
 
 void loop() {

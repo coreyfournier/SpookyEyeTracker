@@ -117,5 +117,6 @@ class EyeLink:
                 "activity": st.get("act") or st.get("state"),   # track/hold/wander/sleep/... (older firmware: state)
                 "pan": st.get("pan"), "tilt": st.get("tilt"),
                 "rssi": st.get("rssi"), "uptime": st.get("up"),
+                "fw": {"version": st.get("fw"), "built": st.get("built"), "board": st.get("board")},
                 "config_in_sync": online and st.get("ver") == want,
                 "last_look": self.last_look.get(eye["id"])}

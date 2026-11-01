@@ -77,6 +77,12 @@ jobs:
             suffix: "-cpu"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # full history, to find the last commit that touched firmware/
+
+      - name: Latest firmware version
+        id: fw
+        run: echo "version=$(git log -1 --format=%H -- firmware | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
       - name: Free disk space (CUDA PyTorch is ~5 GB)
         if: matrix.variant == 'cuda'
@@ -114,7 +120,9 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          build-args: TORCH_VARIANT=${{ matrix.torch }}
+          build-args: |
+            TORCH_VARIANT=${{ matrix.torch }}
+            FIRMWARE_VERSION=${{ steps.fw.outputs.version }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

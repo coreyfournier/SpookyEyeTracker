@@ -17,7 +17,8 @@ class FakeLink:
         return True
 
     def status(self, eye):
-        return {"online": True, "state": "idle", "config_in_sync": True}
+        return {"online": True, "state": "idle", "config_in_sync": True,
+                "fw": {"version": "1111111", "built": "2026-11-01", "board": "featheresp32"}}
 
     def manual(self, eye, **kw):
         self.manuals.append(kw)
@@ -47,6 +48,14 @@ def test_pages_and_state(app):
     state = app.get("/api/state").json()
     assert state["max_cameras"] == 2 and len(state["cameras"]) == 2
     assert state["eyes"]["eye1"]["online"]
+
+
+def test_state_reports_firmware_status(app, monkeypatch):
+    monkeypatch.setenv("EYETRACKER_FIRMWARE_VERSION", "2222222")
+    fw = app.get("/api/state").json()["eyes"]["eye1"]["fw"]
+    assert fw["status"] == "outdated" and fw["latest"] == "2222222" and fw["version"] == "1111111"
+    monkeypatch.setenv("EYETRACKER_FIRMWARE_VERSION", "1111111")
+    assert app.get("/api/state").json()["eyes"]["eye1"]["fw"]["status"] == "current"
 
 
 def test_third_camera_is_rejected(app):

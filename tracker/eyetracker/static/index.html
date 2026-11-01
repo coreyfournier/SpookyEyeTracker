@@ -179,7 +179,7 @@ function eyeCard(eye) {
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
-    <h2>${eye.name || eye.id} <small>${eye.id} · ${eye.ip}:${eye.port}</small> <span class="chip" data-status>…</span></h2>
+    <h2>${eye.name || eye.id} <small>${eye.id} · ${eye.ip}:${eye.port}</small> <span class="chip" data-status>…</span> <span class="chip" data-fw hidden></span></h2>
     <div class="two">
       <div data-form></div>
       <div>
@@ -265,11 +265,29 @@ function eyeCard(eye) {
   };
   card.isDirty = () => dirty;
   card.updateStatus = st => {
+    const f = $('[data-fw]', card), fw = fwInfo(st);
+    f.hidden = !fw;
+    if (fw) { f.innerHTML = `<span class="dot ${fw.cls}"></span>${fw.text}`; f.title = fw.title; }
     const s = $('[data-status]', card);
     s.innerHTML = !st || !st.online ? '<span class="dot bad"></span>offline'
       : `<span class="dot ${st.config_in_sync ? 'ok' : 'warn'}"></span>${st.activity} · ${st.config_in_sync ? 'config synced' : 'config differs'} · ${st.rssi} dBm`;
   };
   return card;
+}
+
+// Firmware version badge: current / outdated / dirty / unknown (see eyetracker/version.py)
+function fwInfo(st) {
+  if (!st?.online || !st.fw) return null;
+  const v = st.fw.version || '?', latest = st.fw.latest;
+  const built = st.fw.built ? `built ${st.fw.built}` : '', board = st.fw.board || '';
+  const title = [`running ${v}`, latest && `latest ${latest}`, built, board].filter(Boolean).join(' · ');
+  switch (st.fw.status) {
+    case 'current': return {cls: 'ok', text: `fw ${v}`, title, short: ''};
+    case 'dirty': return {cls: 'warn', text: `fw ${v}`, title: title + ' · built from uncommitted changes', short: ' · dev fw'};
+    case 'outdated': return {cls: 'bad', text: `fw ${v} → update to ${latest}`, title, short: ' · update fw'};
+    default: return {cls: 'warn', text: st.fw.version ? `fw ${v}` : 'fw unknown — reflash', title: title ||
+      'This eye does not report a firmware version: it predates versioning, so reflash it', short: ' · update fw'};
+  }
 }
 
 // ---------- cameras & settings ----------
@@ -441,7 +459,8 @@ async function poll() {
       if (el) el.textContent = c.connected ? `${c.size[0]}×${c.size[1]} · read ${c.read_fps} fps · detect ${c.detect_fps} fps · ${c.people} people` : 'connecting…';
     }
     for (const [id, st] of Object.entries(state.eyes)) {
-      chips.push(`<span class="chip"><span class="dot ${st.online ? (st.config_in_sync ? 'ok' : 'warn') : 'bad'}"></span>${id} ${st.online ? st.activity : 'offline'}</span>`);
+      const fw = fwInfo(st), stale = fw && fw.short;
+      chips.push(`<span class="chip" title="${fw ? fw.title : ''}"><span class="dot ${st.online ? (st.config_in_sync && !stale ? 'ok' : 'warn') : 'bad'}"></span>${id} ${st.online ? st.activity : 'offline'}${stale ? fw.short : ''}</span>`);
       eyeCards[id]?.updateStatus(st);
     }
     $('#chips').innerHTML = chips.join('');

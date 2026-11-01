@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
 from .config import MAX_CAMERAS, ConfigError
 from .geometry import DEFAULT_AIM
+from .version import firmware_status, latest_firmware_version
 
 STATIC = Path(__file__).resolve().parent / "static"
 SETTINGS_SECTIONS = ("world", "tracking", "director", "detection")
@@ -41,15 +42,25 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
     def get_config():
         return store.get()
 
+    def eye_status(eye, latest):
+        st = link.status(eye)
+        fw = st.setdefault("fw", {})
+        if st.get("online"):
+            fw["status"] = firmware_status(fw.get("version"), latest)
+        fw["latest"] = latest
+        return st
+
     @app.get("/api/state")
     def state():
         cfg = store.get()
+        latest = latest_firmware_version()
         return {
+            "firmware_latest": latest,
             "cameras": cameras.statuses(),
             "max_cameras": MAX_CAMERAS,
             "cameras_active": cameras.active,
             "people": [p.to_dict(time.time()) for p in world.people()],
-            "eyes": {e["id"]: {**link.status(e), "assignment": director.assignments.get(e["id"])}
+            "eyes": {e["id"]: {**eye_status(e, latest), "assignment": director.assignments.get(e["id"])}
                      for e in cfg["eyes"]},
         }
 

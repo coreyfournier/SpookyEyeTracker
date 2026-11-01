@@ -41,6 +41,11 @@ RUN useradd --create-home --uid 1000 eye \
     && chown -R eye /config /tmp/ultralytics /app/tracker
 USER eye
 
+# Latest firmware commit (7 chars) so the UI can flag eyes running older firmware. Set by CI.
+# Declared last so a new firmware commit doesn't invalidate the cached PyTorch layers above.
+ARG FIRMWARE_VERSION=
+ENV EYETRACKER_FIRMWARE_VERSION=${FIRMWARE_VERSION}
+
 VOLUME /config
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
