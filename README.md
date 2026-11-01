@@ -99,7 +99,7 @@ camera.
 |------|------|
 | `tracker/` | Python tracker + web UI; `config.default.yaml` is the config template; `tests/` has the unit tests |
 | `tracker-data/` | Your live `config.yaml` + `calibration.json` (git-ignored, created on first run) |
-| `firmware/` | PlatformIO project for the HiLetgo ESP32 OLED kit (classic ESP32) |
+| `firmware/` | PlatformIO project; one env per eye (`eye1` = HiLetgo OLED kit, `eye2` = Adafruit HUZZAH32 Feather) |
 | `cad/` | `build.py` generates the printable parts into `cad/stl/` |
 | `docs/WIRING.md` | Pins, power and the servo calibration procedure |
 | `Dockerfile`, `docker-compose*.yml` | Container image for the tracker |
@@ -115,6 +115,7 @@ Lengths are approximate, so check against your prints.
 | Qty | Part | Notes |
 |----:|------|-------|
 | 1 | [HiLetgo ESP32 OLED WiFi Kit](https://www.amazon.com/dp/B07DKD79Y9) | Classic ESP32 + 0.96" OLED. Firmware target `heltec_wifi_kit_32_v2` |
+| *or* | Adafruit HUZZAH32 ESP32 Feather | Classic ESP32, no display; status on the red LED. Firmware target `featheresp32` |
 | 1 | [WS2812B 7-LED RGB ring ("jewel")](https://www.amazon.com/dp/B0B2D6JDVJ) | One ring per eye; the pack has 7, enough for 7 eyes. Lights the iris |
 | 4 | SG90 micro servo (9 g) | Pan, tilt, upper lid, lower lid. MG90S (metal gear) is a drop-in upgrade |
 | 1 | 5 V power supply, **3 A or more** | Powers the servos + LEDs. Four servos can stall at over 2 A, so don't use the ESP32's USB 5 V |
@@ -215,12 +216,17 @@ Then browse to `http://<PC IP>:8080` (or `/calibrate`).
 
 ```powershell
 cd firmware
-pio run -e eye1 -t upload
+pio run -e eye1 -t upload        # HiLetgo OLED kit
+pio run -e eye2 -t upload        # Adafruit HUZZAH32 Feather
 pio device monitor
 ```
 
+Each `[env:eyeN]` in `platformio.ini` is one physical eye. It builds on a board section
+(`[heltec]` or `[feather]`) and sets `EYE_NAME`. To add another eye, copy an env, give it the
+next name, and add a matching entry under `eyes:` in the tracker config.
+
 WiFi credentials come from the `ENV_WIFI_SSID` / `ENV_WIFI_PW` environment variables at
-build time. The serial log and OLED show the IP. The OLED's top line shows what the eye is doing right
+build time. The serial log (and the OLED, on the HiLetgo board) shows the IP. The OLED's top line shows what the eye is doing right
 now (**TRACK**, **HOLD**, **STARTLE**, **WANDER**, **IDLE**, **SLEEP** or **MANUAL**). Below that are
 the IP, WiFi signal, time since the last PC packet, the current pan/tilt, and which optional
 behaviors are on. The web UI shows the same activity. The eye stores its last pushed config in

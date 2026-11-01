@@ -6,9 +6,14 @@
 //   {"t":"manual","pan":0,"tilt":0,"lid":1,"raw":[0,0,0,0],"hold_s":15}
 //   {"t":"release"}
 //   {"t":"ping"}                                          -> {"t":"status",...}
+//
+// Status output depends on the board (see platformio.ini):
+//   HAS_OLED        - built-in 128x64 OLED shows activity, IP, signal, pan/tilt
+//   PIN_STATUS_LED  - single LED: fast blink = no WiFi, short blip = waiting for the PC,
+//                     double blip = idle/wander/sleep, solid = tracking, 2 Hz = manual
+// Activity changes are always logged to the serial monitor.
 #include <Arduino.h>
 #include <ArduinoJson.h>
-#include <U8g2lib.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include "behavior.h"
@@ -18,11 +23,16 @@
 #define EYE_NAME "eye"
 #endif
 
-static WiFiUDP udp;
+#if HAS_OLED
+#include <U8g2lib.h>
 static U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, RST_OLED, SCL_OLED, SDA_OLED);
+#endif
+
+static WiFiUDP udp;
 static char packet[1500];
 static uint32_t lastPacketMs = 0;
-static uint32_t lastOledMs = 0;
+static uint32_t lastDisplayMs = 0;
+static const char *lastActivity = "";
 
 static void wifiBegin() {
   WiFi.mode(WIFI_STA);
@@ -104,7 +114,8 @@ static void handlePacket(int len) {
   }
 }
 
-static void drawOled() {
+#if HAS_OLED
+static void drawStatus() {
   char line[32];
   oled.clearBuffer();
 
@@ -139,13 +150,40 @@ static void drawOled() {
   oled.drawStr(0, 63, line[0] ? line : "no behaviors on");
   oled.sendBuffer();
 }
+#elif defined(PIN_STATUS_LED)
+static void drawStatus() {
+  uint32_t t = millis();
+  bool pcOk = lastPacketMs && t - lastPacketMs < 3000;
+  const char *act = behaviorActivity();
+  bool on;
+  if (WiFi.status() != WL_CONNECTED) {
+    on = (t / 125) % 2;                                    // fast blink: no WiFi
+  } else if (!pcOk) {
+    on = t % 2000 < 80;                                    // short blip: waiting for the PC
+  } else if (!strcmp(act, "track") || !strcmp(act, "hold") || !strcmp(act, "startle")) {
+    on = true;                                             // solid: following someone
+  } else if (!strcmp(act, "manual")) {
+    on = (t / 250) % 2;                                    // 2 Hz: manual / calibration
+  } else {
+    uint32_t p = t % 1500;
+    on = p < 60 || (p > 200 && p < 260);                   // double blip: idle / wander / sleep
+  }
+  digitalWrite(PIN_STATUS_LED, on);
+}
+#else
+static void drawStatus() {}
+#endif
 
 void setup() {
   Serial.begin(115200);
+#if HAS_OLED
   pinMode(Vext, OUTPUT);
   digitalWrite(Vext, LOW);  // power the OLED
   delay(50);
   oled.begin();
+#elif defined(PIN_STATUS_LED)
+  pinMode(PIN_STATUS_LED, OUTPUT);
+#endif
 
   configLoad();
   behaviorBegin();
@@ -158,9 +196,18 @@ void loop() {
   int len;
   while ((len = udp.parsePacket()) > 0) handlePacket(len);
   behaviorUpdate();
-  if (millis() - lastOledMs > 250) {
-    lastOledMs = millis();
-    drawOled();
+  const char *act = behaviorActivity();
+  if (strcmp(act, lastActivity)) {
+    lastActivity = act;
+    Serial.printf("activity: %s\n", act);
   }
+#if HAS_OLED
+  if (millis() - lastDisplayMs > 250) {   // the OLED redraw is slow-ish; the LED is cheap
+    lastDisplayMs = millis();
+    drawStatus();
+  }
+#else
+  drawStatus();
+#endif
   delay(1);
 }

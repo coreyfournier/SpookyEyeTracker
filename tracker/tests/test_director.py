@@ -74,14 +74,16 @@ def test_tick_sends_look_and_flags_new_target(store):
     d = Director(store, FakeWorld([person(1, 0, 5)]), link)
     d._tick(store.get())
     d._tick(store.get())
-    assert [l[4] for l in link.looks] == [True, False]     # "new" only on acquisition
-    assert link.looks[0][1] is True
+    eye1 = [l for l in link.looks if l[0] == "eye1"]
+    assert [l[4] for l in eye1] == [True, False]            # "new" only on acquisition
+    assert eye1[0][1] is True
 
 
-def test_tick_without_people_sends_no_target(store):
+def test_tick_without_people_sends_no_target_to_every_eye(store):
     link = FakeLink()
     Director(store, FakeWorld([]), link)._tick(store.get())
-    assert link.looks == [("eye1", False, 0, 0, False)]
+    assert link.looks == [(e["id"], False, 0, 0, False) for e in store.get()["eyes"]]
+    assert len(link.looks) == 2                              # eye1 + eye2
 
 
 def test_aim_correction_is_applied_to_sent_angles(store):

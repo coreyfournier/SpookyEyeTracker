@@ -1,5 +1,9 @@
 # Wiring - one eye
 
+Two boards are supported. Servo pins are the same on both; the LED data pin differs.
+
+## HiLetgo ESP32 OLED WiFi Kit (`eye1`)
+
 Board: HiLetgo **ESP32 OLED WiFi Kit V3**. Despite the name, this is a classic ESP32
 (ESP32-D0WDQ6 chip revision 3) using the Heltec WiFi Kit 32 V2 layout, with a built-in
 0.96" OLED. The pins avoid the OLED (4/15/16), Vext (21), the onboard LED (25), the boot
@@ -14,6 +18,32 @@ are set in `firmware/platformio.ini`.
 | Lower lid servo     | 33         | SG90 #4 orange wire                        |
 | LED jewel DIN       | 13         | WS2812 7-LED jewel **DIN** via 330 Ω       |
 | Ground              | GND        | Common ground with the 5 V supply          |
+
+## Adafruit HUZZAH32 ESP32 Feather (`eye2`)
+
+Classic ESP32 (4 MB flash), no display. The red LED on GPIO 13 shows status:
+
+| LED | Meaning |
+|-----|---------|
+| Fast blink | Connecting to WiFi |
+| Short blip every 2 s | On WiFi, waiting for the tracker |
+| Double blip | Idle / wander / sleep |
+| Solid | Tracking someone |
+| 2 Hz blink | Manual control (calibration) |
+
+The IP and every activity change are printed to the serial monitor (`pio device monitor -e eye2`).
+
+| Function            | Feather pin | GPIO | Goes to |
+|---------------------|-------------|-----:|---------|
+| Pan servo signal    | A0          | 26   | SG90 #1 orange wire |
+| Tilt servo signal   | 27          | 27   | SG90 #2 orange wire |
+| Upper lid servo     | 32          | 32   | SG90 #3 orange wire |
+| Lower lid servo     | 33          | 33   | SG90 #4 orange wire |
+| LED jewel DIN       | 21          | 21   | WS2812 jewel **DIN** via 330 Ω (GPIO 13 is the red LED, so it isn't used) |
+| Ground              | GND         |      | Common ground with the 5 V supply |
+
+Power the Feather from USB or its `USB` pin. Don't feed the 5 V servo supply into the `BAT`
+pin, which is for a 3.7 V LiPo only.
 
 ## Power
 

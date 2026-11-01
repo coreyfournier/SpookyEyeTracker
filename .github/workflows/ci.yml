@@ -51,12 +51,12 @@ jobs:
           path: ~/.platformio
           key: pio-${{ hashFiles('firmware/platformio.ini') }}
       - run: pip install platformio
-      - name: Compile
+      - name: Compile all boards
         working-directory: firmware
         env:
           ENV_WIFI_SSID: ci-placeholder     # real credentials are only needed when flashing
           ENV_WIFI_PW: ci-placeholder
-        run: pio run -e eye1
+        run: pio run
 
   docker:
     name: Docker image (${{ matrix.variant }})

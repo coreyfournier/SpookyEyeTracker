@@ -96,6 +96,35 @@ eyes:
       spooky: {enabled: false, flicker: 0.3, pulse_hz: 1.0, startle: true}
       sleep: {enabled: true, after_s: 60.0, lid: 0.0}
       lids: {follow_gaze: true, idle_open: 0.85}
+- id: eye2
+  name: Feather eye
+  enabled: true
+  ip: 192.168.2.144      # Adafruit HUZZAH32 Feather (no OLED - IP is in the serial log)
+  port: 4210
+  position: [0.3, 0.3, 1.2]   # guess - measure and correct
+  heading: 0.0
+  pitch: 0.0
+  aim: {pan_offset: 0.0, pan_scale: 1.0, tilt_offset: 0.0, tilt_scale: 1.0}
+  firmware:              # pushed to the eye over UDP and stored in its flash
+    servos:
+      pan: {center: 1500, us_per_deg: 30.0, min: -25.0, max: 25.0}
+      tilt: {center: 1500, us_per_deg: 30.0, min: -15.0, max: 15.0}
+      lid_upper: {open: 1100, closed: 1700}
+      lid_lower: {open: 1900, closed: 1300}
+    motion: {max_speed: 400.0, smoothing: 0.08, track_hold: 2.0}
+    behaviors:
+      blink: {enabled: true, min_s: 2.0, max_s: 7.0, duration_ms: 180, double_chance: 0.15}
+      wander: {enabled: true, min_s: 1.5, max_s: 5.0, range_pan: 15.0, range_tilt: 6.0}
+      iris:
+        enabled: true
+        idle: [255, 110, 0]
+        track: [255, 0, 0]
+        sleep: [40, 0, 0]
+        pupil: [0, 0, 0]
+        brightness: 160
+      spooky: {enabled: false, flicker: 0.3, pulse_hz: 1.0, startle: true}
+      sleep: {enabled: true, after_s: 60.0, lid: 0.0}
+      lids: {follow_gaze: true, idle_open: 0.85}
 
 web:
   host: 0.0.0.0
