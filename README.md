@@ -62,6 +62,11 @@ The **Eyes** tab has one card per eye:
 - **Settings:** servo centers and limits, motion smoothing, and each behavior, all
   switchable (blink, idle wander, iris colors by state, spooky mode, sleep, lids following
   the gaze).
+- **Identify:** lights that eye in one pulsing colour (cyan for eye1 and magenta for eye2 by
+  default; `identify_color`), centres it with the lids open and stops tracking, wandering
+  and blinking, so you can see which physical eye you're configuring. Its OLED shows
+  **IDENTIFY** (the Feather's LED blinks at 1 Hz). Manual control still works while it's
+  on. It turns off when you toggle it off, close the page, or after 60 s without the UI.
 - **Manual-control sliders:** take over the servos to find their positions.
 - **Save & Push:** writes the config file and sends the settings to the ESP32 over UDP.
 - **Push:** re-sends the saved settings if the eye missed them. The status chip shows
@@ -78,7 +83,8 @@ edited live. Cameras can be added or removed, up to two, without restarting.
 
 <img src="docs/images/calibrate-phone.png" alt="Phone calibration page" width="300" align="right">
 
-Open `/calibrate` on your phone and stand in the yard. The page shows who the cameras
+Open `/calibrate` on your phone and stand in the yard (tap **Identify** first if you have
+several eyes, to make sure you've picked the right one). The page shows who the cameras
 see, how far away they are, and their eye-level height.
 
 1. **Snap to me** points the eye where the tracker thinks you are.

@@ -73,6 +73,7 @@ eyes:
   pitch: 0.0
   # PC-side aim correction, fitted by calibrate-by-pointing (/calibrate) and applied to
   # every angle before it is sent: sent = offset + scale * geometric angle. Never pushed.
+  identify_color: [0, 255, 255]   # colour shown by Identify (UI button) to find this eye
   aim: {pan_offset: 0.0, pan_scale: 1.0, tilt_offset: 0.0, tilt_scale: 1.0}
   # Mechanical servo calibration below lives on the eye (idle wander, sleep and limits
   # work even when the PC is offline). Set it once per build with the Eyes tab sliders.
@@ -104,6 +105,7 @@ eyes:
   position: [0.3, 0.3, 1.2]   # guess - measure and correct
   heading: 0.0
   pitch: 0.0
+  identify_color: [255, 0, 255]   # colour shown by Identify (UI button) to find this eye
   aim: {pan_offset: 0.0, pan_scale: 1.0, tilt_offset: 0.0, tilt_scale: 1.0}
   firmware:              # pushed to the eye over UDP and stored in its flash
     servos:

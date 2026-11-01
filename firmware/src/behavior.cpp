@@ -24,7 +24,9 @@ static uint32_t nextWanderMs = 0;
 static uint32_t startleUntil = 0;
 static uint32_t flickerUntil = 0;
 static float flickerLevel = 1.0f;
-static bool holding = false;               // tracking a person who just went out of view
+static bool holding = false;
+static uint32_t identifyUntil = 0;
+static uint8_t identifyRgb[3] = {0, 255, 255};               // tracking a person who just went out of view
 
 static float frand(float a, float b) { return a + (b - a) * (esp_random() / 4294967295.0f); }
 static float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -80,6 +82,13 @@ void behaviorOnManual(const ManualCmd &cmd) { manual = cmd; }
 
 void behaviorRelease() { manual.untilMs = 0; }
 
+void behaviorIdentify(bool on, uint8_t r, uint8_t g, uint8_t b, uint32_t holdMs) {
+  identifyRgb[0] = r, identifyRgb[1] = g, identifyRgb[2] = b;
+  identifyUntil = on ? millis() + holdMs : 0;
+}
+
+bool behaviorIdentifying() { return millis() < identifyUntil; }
+
 // Blink envelope: 1 = open, dips to 0 and back over blinkMs.
 static float blinkFactor(uint32_t now, bool allowed) {
   if (!cfg.blinkEnabled || !allowed) {
@@ -111,6 +120,14 @@ static Rgb scale(Rgb c, float k) {
 }
 
 static void updateLeds(uint32_t now) {
+  if (now < identifyUntil) {   // one slowly pulsing colour on every LED, nothing else
+    float k = 0.55f + 0.45f * sinf(now * 0.001f * TWO_PI * 0.7f);
+    leds.setBrightness(255);
+    for (int i = 0; i < NUM_LEDS; i++)
+      leds.setPixelColor(i, identifyRgb[0] * k, identifyRgb[1] * k, identifyRgb[2] * k);
+    leds.show();
+    return;
+  }
   Rgb iris;
   float level = 1.0f;
   if (!cfg.irisEnabled) {
@@ -164,6 +181,10 @@ void behaviorUpdate() {
     goalPan = manual.pan;
     goalTilt = manual.tilt;
     lidBase = manual.lid;
+  } else if (now < identifyUntil) {
+    state = EyeState::Identify;
+    goalPan = goalTilt = 0;
+    lidBase = 1.0f;
   } else if (targetFresh) {
     state = EyeState::Track;
     goalPan = look.pan;
@@ -208,7 +229,7 @@ void behaviorUpdate() {
     upper = clampf(upper + 0.15f * t, 0, 1);
     lower = clampf(lower - 0.15f * t, 0, 1);
   }
-  float blink = blinkFactor(now, state != EyeState::Sleep && state != EyeState::Manual);
+  float blink = blinkFactor(now, state != EyeState::Sleep && state != EyeState::Manual && state != EyeState::Identify);
   upper *= blink;
   lower *= blink;
 
@@ -228,6 +249,7 @@ float behaviorTilt() { return curTilt; }
 const char *behaviorActivity() {
   switch (state) {
     case EyeState::Manual: return "manual";
+    case EyeState::Identify: return "identify";
     case EyeState::Sleep: return "sleep";
     case EyeState::Track:
       if (millis() < startleUntil) return "startle";

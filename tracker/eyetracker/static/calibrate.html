@@ -57,6 +57,7 @@
   <header>
     <h1>👁 Calibrate by pointing</h1>
     <select id="eye" aria-label="Eye"></select>
+    <button id="ident" title="Light this eye in one colour so you know which one you're calibrating">Identify</button>
     <a href="/">Main UI</a>
   </header>
 
@@ -173,7 +174,27 @@ $('#clear').onclick = async () => {
   if (!confirm('Delete all samples for this eye?')) return;
   await api(`/api/calib/${eyeId}/clear`, {}); refresh();
 };
-$('#eye').onchange = () => { eyeId = $('#eye').value; active = false; refresh(); };
+// Identify: the selected eye glows one colour (and the arrows still move it)
+let identOn = false, identTimer = null;
+async function setIdent(on, id = eyeId) {
+  clearInterval(identTimer);
+  identOn = on;
+  try {
+    const r = await api(`/api/eyes/${id}/identify`, {on, hold_s: 60});
+    $('#ident').innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;` +
+      `vertical-align:middle;background:rgb(${r.rgb.join(',')})"></span>${on ? 'Stop' : 'Identify'}`;
+  } catch (e) { toast(e.message); }
+  $('#ident').classList.toggle('primary', on);
+  if (on) identTimer = setInterval(() => api(`/api/eyes/${id}/identify`, {on: true, hold_s: 60}), 20000);
+}
+$('#ident').onclick = () => setIdent(!identOn);
+addEventListener('pagehide', () => {
+  if (identOn) navigator.sendBeacon(`/api/eyes/${eyeId}/identify`, new Blob([JSON.stringify({on: false})], {type: 'application/json'}));
+});
+$('#eye').onchange = async () => {
+  if (identOn) await setIdent(false, eyeId);       // stop identifying the previous eye
+  eyeId = $('#eye').value; active = false; refresh();
+};
 
 function render() {
   const t = data.target, e = data.eye;

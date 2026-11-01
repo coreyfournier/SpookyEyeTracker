@@ -15,6 +15,8 @@ from .version import firmware_status, latest_firmware_version
 
 STATIC = Path(__file__).resolve().parent / "static"
 SETTINGS_SECTIONS = ("world", "tracking", "director", "detection")
+# Default identify colours, in config order: cyan, magenta, yellow, green, blue, white.
+IDENTIFY_PALETTE = ([0, 255, 255], [255, 0, 255], [255, 200, 0], [0, 255, 0], [0, 60, 255], [255, 255, 255])
 
 
 def create_app(store, world, link, director, cameras, calib) -> FastAPI:
@@ -24,6 +26,13 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
     @app.exception_handler(ConfigError)
     def config_error(_request: Request, exc: ConfigError):
         return JSONResponse({"detail": str(exc)}, status_code=400)
+
+    def identify_color(eye):
+        """The eye's identify_color, else a distinct default by its position in the config."""
+        if eye.get("identify_color"):
+            return eye["identify_color"]
+        ids = [e["id"] for e in store.get()["eyes"]]
+        return IDENTIFY_PALETTE[ids.index(eye["id"]) % len(IDENTIFY_PALETTE)]
 
     def eye_or_404(eye_id):
         eye = store.eye(eye_id)
@@ -104,6 +113,15 @@ def create_app(store, world, link, director, cameras, calib) -> FastAPI:
         except OtaError as exc:
             raise HTTPException(400, str(exc))
         return {"ok": True, "board": board, "eye": reply}
+
+    @app.post("/api/eyes/{eye_id}/identify")
+    def identify(eye_id: str, body: dict = Body(...)):
+        """{"on": true} lights the eye in its identify colour for hold_s (default 60 s; the UI
+        re-sends while the toggle is on, so a closed browser can't leave an eye stuck)."""
+        eye = eye_or_404(eye_id)
+        rgb = identify_color(eye)
+        link.identify(eye, bool(body.get("on", True)), rgb, float(body.get("hold_s", 60)))
+        return {"ok": True, "rgb": rgb}
 
     @app.post("/api/eyes/{eye_id}/look_at")
     def look_at(eye_id: str, body: dict = Body(...)):

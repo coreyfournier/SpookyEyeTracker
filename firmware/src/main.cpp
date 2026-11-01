@@ -4,13 +4,15 @@
 //   {"t":"look","tgt":1,"pan":12.5,"tilt":-3.0,"new":0}  ~20 Hz, tgt=0 means nobody
 //   {"t":"cfg","ver":123,...}                             -> {"t":"ack","ver":123}
 //   {"t":"manual","pan":0,"tilt":0,"lid":1,"raw":[0,0,0,0],"hold_s":15}
+//   {"t":"identify","on":1,"rgb":[0,255,255],"hold_s":60}   locate this eye
 //   {"t":"release"}
 //   {"t":"ping"}                                          -> {"t":"status",...}
 //
 // Status output depends on the board (see platformio.ini):
 //   HAS_OLED        - built-in 128x64 OLED shows activity, IP, signal, pan/tilt
 //   PIN_STATUS_LED  - single LED: flicker = updating firmware, fast blink = no WiFi, short blip = waiting for the PC,
-//                     double blip = idle/wander/sleep, solid = tracking, 2 Hz = manual
+//                     double blip = idle/wander/sleep, solid = tracking, 2 Hz = manual,
+//                     1 Hz = identify
 // Activity changes are always logged to the serial monitor.
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -74,6 +76,7 @@ static void sendStatus() {
   doc["built"] = FW_BUILT;
   doc["board"] = FW_BOARD;
   doc["ota"] = otaEnabled();
+  doc["ident"] = behaviorIdentifying();
   reply(doc);
 }
 
@@ -110,6 +113,10 @@ static void handlePacket(int len) {
     for (int i = 0; i < 4 && i < (int)raw.size(); i++) m.rawUs[i] = raw[i] | 0;
     m.untilMs = lastPacketMs + (uint32_t)((doc["hold_s"] | 15.0f) * 1000);
     behaviorOnManual(m);
+  } else if (!strcmp(t, "identify")) {
+    JsonArrayConst rgb = doc["rgb"];
+    behaviorIdentify(doc["on"] | 0, rgb[0] | 0, rgb[1] | 255, rgb[2] | 255,
+                     (uint32_t)((doc["hold_s"] | 60.0f) * 1000));
   } else if (!strcmp(t, "release")) {
     behaviorRelease();
   } else if (!strcmp(t, "ping")) {
@@ -177,6 +184,8 @@ static void drawStatus() {
     on = t % 2000 < 80;                                    // short blip: waiting for the PC
   } else if (!strcmp(act, "track") || !strcmp(act, "hold") || !strcmp(act, "startle")) {
     on = true;                                             // solid: following someone
+  } else if (!strcmp(act, "identify")) {
+    on = (t / 500) % 2;                                    // 1 Hz: identify
   } else if (!strcmp(act, "manual")) {
     on = (t / 250) % 2;                                    // 2 Hz: manual / calibration
   } else {

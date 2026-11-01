@@ -10,7 +10,7 @@ from eyetracker.world import World
 
 class FakeLink:
     def __init__(self):
-        self.pushed, self.manuals = [], []
+        self.pushed, self.manuals, self.identifies = [], [], []
 
     def push_config(self, eye, **_):
         self.pushed.append(eye["id"])
@@ -25,6 +25,9 @@ class FakeLink:
 
     def release(self, eye):
         pass
+
+    def identify(self, eye, on, rgb, hold_s=60):
+        self.identifies.append((eye["id"], on, list(rgb), hold_s))
 
     def look(self, *a, **kw):
         pass
@@ -125,3 +128,17 @@ def test_firmware_upload_checks_board_before_sending(app):
 def test_firmware_upload_rejects_non_firmware(app):
     r = app.post("/api/eyes/eye1/firmware", content=b"definitely not firmware")
     assert r.status_code == 400 and "not an ESP32 firmware image" in r.json()["detail"]
+
+
+def test_identify_uses_the_eyes_colour(app):
+    r = app.post("/api/eyes/eye2/identify", json={"on": True}).json()
+    assert r["rgb"] == [255, 0, 255]                         # identify_color from the config
+    app.post("/api/eyes/eye2/identify", json={"on": False})
+    assert app.link.identifies == [("eye2", True, [255, 0, 255], 60.0), ("eye2", False, [255, 0, 255], 60.0)]
+
+
+def test_identify_colour_defaults_by_position(app, store):
+    eye = store.eye("eye2")
+    eye.pop("identify_color")
+    store.replace_item("eyes", eye, save=False)
+    assert app.post("/api/eyes/eye2/identify", json={"on": True}).json()["rgb"] == [255, 0, 255]   # 2nd default

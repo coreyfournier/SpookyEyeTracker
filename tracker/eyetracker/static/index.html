@@ -100,8 +100,25 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   if (b.dataset.tab === 'live') resizeMap();
 });
 
+// ---------- identify: light one eye in a single colour so you can find it ----------
+const identify = {};   // eye id -> {on, rgb, timer}
+const swatch = c => `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;` +
+  `background:rgb(${c.join(',')});margin-right:6px;vertical-align:middle;border:1px solid var(--line)"></span>`;
+async function setIdentify(eyeId, on) {
+  const st = identify[eyeId] ||= {};
+  clearInterval(st.timer);
+  const r = await api(`/api/eyes/${eyeId}/identify`, {on, hold_s: 60});
+  Object.assign(st, {on, rgb: r.rgb});
+  // the eye drops out of identify after 60 s on its own; keep it going while the toggle is on
+  if (on) st.timer = setInterval(() => api(`/api/eyes/${eyeId}/identify`, {on: true, hold_s: 60}), 20000);
+}
+addEventListener('pagehide', () => {
+  for (const [id, st] of Object.entries(identify)) if (st.on)
+    navigator.sendBeacon(`/api/eyes/${id}/identify`, new Blob([JSON.stringify({on: false})], {type: 'application/json'}));
+});
+
 // ---------- generic form builder ----------
-const COLOR_KEYS = new Set(['idle', 'track', 'sleep', 'sclera']);
+const COLOR_KEYS = new Set(['idle', 'track', 'sleep', 'sclera', 'identify_color']);
 const toHex = c => '#' + c.map(v => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
 const fromHex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
 
@@ -179,7 +196,8 @@ function eyeCard(eye) {
   const card = document.createElement('div');
   card.className = 'card';
   card.innerHTML = `
-    <h2>${eye.name || eye.id} <small>${eye.id} · ${eye.ip}:${eye.port}</small> <span class="chip" data-status>…</span> <span class="chip" data-fw hidden></span></h2>
+    <h2>${eye.name || eye.id} <small>${eye.id} · ${eye.ip}:${eye.port}</small> <span class="chip" data-status>…</span> <span class="chip" data-fw hidden></span>
+      <button class="btn" data-ident title="Light this eye in one colour, centred and still, so you can see which one it is">Identify</button></h2>
     <div class="two">
       <div data-form></div>
       <div>
@@ -280,6 +298,15 @@ function eyeCard(eye) {
     } catch (e) { msg.textContent = 'Update failed: ' + e.message; }
     setBusy(false);
   };
+  const identBtn = $('[data-ident]', card);
+  card.renderIdentify = () => {
+    const st = identify[eye.id];
+    identBtn.innerHTML = (st?.rgb ? swatch(st.rgb) : '') + (st?.on ? 'Identifying — stop' : 'Identify');
+    identBtn.classList.toggle('primary', !!st?.on);
+  };
+  identBtn.onclick = () => setIdentify(eye.id, !identify[eye.id]?.on).then(card.renderIdentify)
+    .catch(e => msg.textContent = e.message);
+  card.renderIdentify();
   card.isDirty = () => dirty;
   card.updateStatus = st => {
     const f = $('[data-fw]', card), fw = fwInfo(st);

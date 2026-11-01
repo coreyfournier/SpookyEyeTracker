@@ -103,8 +103,10 @@ def test_look_and_manual_messages(linked, fake_eye):
     link.look(eye, True, 12.345, -3.21, new=True)
     link.manual(eye, pan=5, raw=[1500, 0, 0, 0])
     link.release(eye)
-    assert wait_for(lambda: len([m for m in fake_eye.received if m["t"] != "ping"]) >= 3)
+    link.identify(eye, True, (0, 255, 255), hold_s=30)
+    assert wait_for(lambda: len([m for m in fake_eye.received if m["t"] != "ping"]) >= 4)
     msgs = [m for m in fake_eye.received if m["t"] != "ping"]
     assert msgs[0] == {"t": "look", "tgt": 1, "pan": 12.35, "tilt": -3.21, "new": 1}
     assert msgs[1]["t"] == "manual" and msgs[1]["raw"] == [1500, 0, 0, 0]
     assert msgs[2] == {"t": "release"}
+    assert msgs[3] == {"t": "identify", "on": 1, "rgb": [0, 255, 255], "hold_s": 30}

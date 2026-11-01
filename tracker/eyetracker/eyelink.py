@@ -53,6 +53,10 @@ class EyeLink:
         self.send(eye, {"t": "manual", "pan": pan, "tilt": tilt, "lid": lid, "raw": raw or [0, 0, 0, 0],
                         "hold_s": hold_s})
 
+    def identify(self, eye: dict, on: bool, rgb, hold_s: float = 60.0):
+        """Light the eye in one colour, centred and still, so you can tell which one it is."""
+        self.send(eye, {"t": "identify", "on": int(on), "rgb": [int(c) for c in rgb], "hold_s": hold_s})
+
     def release(self, eye: dict):
         self.send(eye, {"t": "release"})
 
@@ -114,7 +118,8 @@ class EyeLink:
         online = bool(st) and time.time() - st["seen"] < OFFLINE_AFTER
         want = firmware_version(eye["firmware"])
         return {"online": online, "state": st.get("state"),
-                "activity": st.get("act") or st.get("state"),   # track/hold/wander/sleep/... (older firmware: state)
+                "activity": st.get("act") or st.get("state"),
+                "identifying": bool(st.get("ident")),   # track/hold/wander/sleep/... (older firmware: state)
                 "pan": st.get("pan"), "tilt": st.get("tilt"),
                 "rssi": st.get("rssi"), "uptime": st.get("up"),
                 "fw": {"version": st.get("fw"), "built": st.get("built"), "board": st.get("board"),
