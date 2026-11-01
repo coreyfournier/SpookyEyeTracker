@@ -1,4 +1,4 @@
-"""Render the CAD parts to PNGs for the README (docs/images/cad-*.png).
+"""Render the CAD parts to PNGs for the docs (docs/images/cad-*.png).
 
     .venv\\Scripts\\python cad\\render.py
 

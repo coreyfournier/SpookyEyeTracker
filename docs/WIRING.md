@@ -1,5 +1,7 @@
 # Wiring - one eye
 
+[← Back to the overview](../README.md) · [Firmware](FIRMWARE.md)
+
 Two boards are supported. Servo pins are the same on both; the LED data pin differs.
 
 ## HiLetgo ESP32 OLED WiFi Kit (`eye1`)
@@ -80,5 +82,5 @@ white will swap colours: change the indices in `behavior.cpp` `updateLeds()`.
    servo moves the wrong way). Use the **Pan °/Tilt °** sliders to confirm ±20° looks right.
 4. **Save & Push**. This is the eye's *mechanical* calibration and is stored on the ESP32.
    Aiming at people (correcting for camera placement) is done separately with calibrate by
-   pointing, which stays on the PC and never needs another push. See the README's
-   **Calibrate** section.
+   pointing, which stays on the PC and never needs another push. See
+   [Tracker → calibration](TRACKER.md#calibration).
