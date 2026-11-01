@@ -340,6 +340,38 @@ sleep) and the white shows the `sclera` colour. Paint a pupil on the iris if you
   outside dark.
 - `eye_rear.stl` has snap-off blocks under its pivot bosses, and `yoke.stl` sits flat.
 
+**Window mount.** `frame.stl` hangs the whole eye on the inside of a window. Its front
+plate sits flat against the glass, with an arched opening the eye looks out through. Above
+the eye is a pocket for one large threaded suction cup (UBL large threaded cup, up to
+2.68" / 68 mm across, 8-32 stud):
+
+1. Press the cup onto the glass where the eye should go.
+2. Push the frame over it, so the cup sits in the pocket and its stud comes through the
+   hole in the pocket floor.
+3. Thread the brass nut on behind and snug it up. That pulls the frame flat against the
+   glass, and the frame hangs plumb under the cup on its own.
+
+The pocket is 14 mm deep, measured from the glass to the back of the cup's hub (`CUP_DEPTH`
+in `cad/build.py`). Press one of your cups flat on a window and measure:
+- **Hub sits shallower than 14 mm:** stack `cup_shims.stl` washers (1, 2 and 4 mm) on the
+  stud between the hub and the pocket floor.
+- **Hub sits much deeper:** set `CUP_DEPTH` and rebuild.
+
+The whole frame (tray, servo cradles and window plate) is about 400 g of PLA. One cup is
+rated for 7 lb.
+
+To save filament and print time, every wall of the frame is a thin plate with diamond
+lattice cut-outs. The plates stay solid wherever another part joins them, and diagonal ribs
+carry the cup's pull down to the base corners. **Print it base-down at 100% infill (or
+enough walls to fill 3-4 mm) with no supports.**
+- The lattice diamonds have 60° sides, so they're self-supporting.
+- The view opening and the cup pocket have 45° shoulders up to a 20 mm flat top that
+  bridges.
+- The cup pocket has a 45° chin underneath, so nothing starts in mid-air.
+
+The frame is 180 × 188 × 217 mm (W × D × H), so it needs a printer with at least 220 mm of
+Z height.
+
 ## Tests and CI
 
 Run the unit tests locally (no GPU, cameras or ESP32 needed):

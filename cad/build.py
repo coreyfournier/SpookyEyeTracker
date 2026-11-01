@@ -1,7 +1,7 @@
 """Animatronic eye (4in / 102mm hollow) with X/Y gimbal + upper/lower eyelids, SG90 servos.
 Coordinates: origin = eye center, +Y = gaze forward, +Z = up, X = lateral. Units mm."""
 import numpy as np, trimesh, os
-from manifold3d import Manifold as M, CrossSection as CS
+from manifold3d import Manifold as M, CrossSection as CS, JoinType, OpType
 
 SEG = 96
 OUT = os.path.dirname(os.path.abspath(__file__)) + "/stl"
@@ -220,16 +220,136 @@ def cradle_plate_x(face, thk_dir, cy, cz, y0, y1, z0, z1):
         p -= cyl_x(0.9, xa - 1, xb + 1, y=cy + d, z=cz)
     return p
 
+# ---------------- WINDOW MOUNT ----------------
+# The frame's front is a plate that sits flush on the window glass, with a hole the eye looks
+# out through. It rises above the eye to a pocket for one threaded suction cup (stud through
+# the back of the pocket, brass nut behind). The whole frame is built from thin plates with
+# lattice cut-outs (print it with 100% infill / solid walls: no hidden infill to print).
+Y_GLASS = 60.0                # glass plane; lids reach y 56.5, so 3.5mm clearance
+PLATE_T = 4.0                 # front plate thickness
+VIEW_R = 40.0                 # hole the eye looks through (80mm; the eye can turn +-25 deg inside it)
+CUP_POCKET_R = 35.0           # suction cup up to 2.68in (68mm) across, pressed flat
+CUP_DEPTH = 14.0              # glass to the back of the cup's hub when pressed on the glass. MEASURE
+                              # YOURS: too deep is fine (add cup_shims between hub and pocket floor)
+CUP_Z = 97.0                  # suction cup centre height above the eye centre
+CUP_WALL = 3.0
+STUD_R = 2.4                  # 8-32 stud (4.17mm) clearance
+ARCH_FLAT = 10.0              # half-width of the flat (bridged) top of holes in upright walls
+RIB = 3.0                     # lattice rib width
+LATTICE = 24.0                # lattice rib spacing
+BASE_T = 4.0                  # base plate and rear (servo) wall thickness
+REAR_Y = -127.0               # back face of the rear wall
+
+# Cross-sections are used to find what touches a plate: Manifold.project() returns close to the
+# convex hull for some shapes, which would mark whole plates as "keep solid".
+def section_xz(m, y):
+    """Cut through a solid at Y = y, as a CrossSection in (x, z)."""
+    return m.rotate([-90, 0, 0]).slice(-y)      # (x, y, z) -> (x, z, -y)
+
+def section_yz(m, x):
+    """Cut through a solid at X = x, as a CrossSection in (y, z)."""
+    return m.rotate([0, 0, -90]).rotate([-90, 0, 0]).slice(x)   # (x, y, z) -> (y, z, x)
+
+def xz_slab(cs, y0, y1):
+    """Extrude an (x, z) section along Y between y0 and y1."""
+    return cs.extrude(y1 - y0).transform([[1, 0, 0, 0], [0, 0, -1, y1], [0, 1, 0, 0]])
+
+def yz_slab(cs, x0, x1):
+    return cs.extrude(x1 - x0).transform([[0, 0, 1, x0], [1, 0, 0, 0], [0, 1, 0, 0]])
+
+def lattice_holes(region, keep=None, border=5.0, angle=60.0, min_area=30.0):
+    """Diamond cut-outs filling `region` (CrossSection), leaving RIB-wide ribs at +-angle, a
+    `border` round the edge and solid wherever `keep` is (plus RIB). 60 deg ribs make every
+    hole self-supporting when the plate prints standing up."""
+    area = region.offset(-border, JoinType.Miter)
+    if keep is not None:
+        area = area - keep.offset(RIB, JoinType.Round)
+    (x0, y0, x1, y1) = region.bounds()
+    cx, cy, R = (x0 + x1) / 2, (y0 + y1) / 2, np.hypot(x1 - x0, y1 - y0)
+    ribs = []
+    for a in (angle, 180 - angle):
+        n = np.radians(a + 90)
+        for k in np.arange(-R, R, LATTICE):
+            ribs.append(CS.square([2 * R, RIB], center=True).rotate(a)
+                        .translate([cx + k * np.cos(n), cy + k * np.sin(n)]))
+    holes = (area - CS.batch_boolean(ribs, OpType.Add))
+    holes = holes.offset(-1.2, JoinType.Round).offset(1.2, JoinType.Round)   # round corners, drop slivers
+    return CS.compose([p for p in holes.decompose() if p.area() >= min_area])
+
+def circle(r, x=0.0, y=0.0):
+    return CS.circle(r, SEG).translate([x, y])
+
+def rect(x0, x1, y0, y1):
+    return CS.square([x1 - x0, y1 - y0]).translate([x0, y0])
+
+def arch(r, x=0.0, z=0.0):
+    """Round hole for an upright wall: 45 deg shoulders up to a short flat top that bridges
+    cleanly (a plain circle's top sags when printed standing up)."""
+    a = r / np.sqrt(2)
+    top = 2 * a - ARCH_FLAT
+    return (circle(r) + CS([[(-a, a), (a, a), (ARCH_FLAT, top), (-ARCH_FLAT, top)]])).translate([x, z])
+
+def front_outline():
+    """Front plate in (x, z): full width at the bottom, narrowing up to the suction cup."""
+    return (rect(-90, 90, -H - BASE_T, 40) + arch(CUP_POCKET_R + 4, 0, CUP_Z)).hull()
+
+def cup_housing():
+    """Pocket for the suction cup: open toward the glass, stud hole in its floor. Its underside is
+    a 45 deg chin down to the front plate, so nothing starts in mid-air when printing."""
+    y_floor = Y_GLASS - CUP_DEPTH
+    back = y_floor - PLATE_T                      # back face of the pocket floor
+    z_chin = CUP_Z - CUP_POCKET_R - CUP_WALL - (y_floor - back) - (Y_GLASS - PLATE_T - y_floor)
+    outer = arch(CUP_POCKET_R + CUP_WALL, 0, CUP_Z) + rect(-CUP_POCKET_R - CUP_WALL, CUP_POCKET_R + CUP_WALL,
+                                                           z_chin, CUP_Z)
+    h = xz_slab(outer, back, Y_GLASS)
+    # keep only what's above a 45 deg plane rising from the plate back toward the pocket floor
+    yb = Y_GLASS - PLATE_T
+    above = CS([[(yb, z_chin), (Y_GLASS + 1, z_chin - 50), (Y_GLASS + 1, 400), (yb - 300, 400),
+                 (yb - 300, z_chin + 300)]])
+    h ^= yz_slab(above, -100, 100)
+    h -= xz_slab(arch(CUP_POCKET_R, 0, CUP_Z), y_floor, Y_GLASS + 1)
+    return h - cyl_y(STUD_R, back - 1, y_floor + 1, z=CUP_Z)
+
+def window_mount():
+    """Front plate + cup housing + stiffening ribs + side gussets (before the lattice)."""
+    view = xz_slab(arch(VIEW_R), Y_GLASS - 20, Y_GLASS + 1)
+    pocket = xz_slab(arch(CUP_POCKET_R, 0, CUP_Z), Y_GLASS - CUP_DEPTH, Y_GLASS + 1)
+    m = xz_slab(front_outline(), Y_GLASS - PLATE_T, Y_GLASS) + cup_housing()
+    # bezel round the view hole stiffens its edge (lids stay inside r 26 at this depth)
+    # (a 45 deg keel underneath, so its lowest point doesn't start in mid-air)
+    keel = CS([[(-(VIEW_R + RIB), 0), (0, -(VIEW_R + RIB) * np.sqrt(2)), (VIEW_R + RIB, 0)]])
+    m += xz_slab(arch(VIEW_R + RIB) + keel, Y_GLASS - 10, Y_GLASS - PLATE_T)
+    # diagonal ribs behind the plate: carry the cup's pull down to the base corners
+    for s in (1, -1):
+        rib = (circle(RIB / 2, s * 30, CUP_Z - 20) + circle(RIB / 2, s * 86, -H + 2)).hull()
+        m += xz_slab(rib, Y_GLASS - 14, Y_GLASS - PLATE_T)
+    m -= view + pocket                               # ribs and bezel never cross the openings
+    # side gussets: triangles tying the front plate to the base along both outer edges
+    gusset = CS([[(Y_GLASS - PLATE_T, -H), (Y_GLASS - PLATE_T, 40), (-40, -H)]])
+    for x0 in (86, -90):
+        m += yz_slab(gusset, x0, x0 + 4)
+    return m
+
+def cup_shims():
+    """Spacers between the cup hub and the pocket floor if your cup is shorter than CUP_DEPTH."""
+    s = M()
+    for i, t in enumerate((1.0, 2.0, 4.0)):
+        s += (cyl_z(10, 0, t) - cyl_z(STUD_R, -1, t + 1)).translate([i * 24, 0, 0])
+    return s
+
 def frame():
     zb = -H
-    f = box(-90, 90, -128, 62, zb - 5, zb)                         # base plate
+    f = box(-90, 90, REAR_Y, Y_GLASS - PLATE_T, zb - BASE_T, zb)    # base plate
     for x0, x1 in ((60.5, 65.5), (-65.5, -60.5)):                   # lid pivot uprights
         up = M.batch_hull([box(x0, x1, -30, 30, zb, zb + 1), box(x0, x1, -12, 12, -1, 0),
                            cyl_x(12, x0, x1)])
         f += up - cyl_x(TAP, x0 - 1, x1 + 1)
-    f += box(-90, 90, -128, -123, zb, 35)                           # rear wall
-    f += box(-7.5, 7.5, -123, -56, zb, -8)                          # stalk pedestal
+    f += box(-90, 90, REAR_Y, REAR_Y + BASE_T, zb, 35)              # rear wall
+    # stalk pedestal: a channel (top plate + two side walls) with bosses for the stalk screws
+    f += box(-7.5, 7.5, -123, -56, -14, -8)
+    f += box(-7.5, -4.5, -123, -56, zb, -8) + box(4.5, 7.5, -123, -56, zb, -8)
     for yy in (-100, -75):
+        f += cyl_z(4.5, zb, -8, y=yy) ^ box(-7.5, 7.5, -130, 0, zb - 1, 0)
         f -= cyl_z(TAP, -30, -7, y=yy)
     # pan servo (shaft +Z at x=36,y=-85, horn plane z=0)
     f += cradle_plate_z(36, -90.5, -11, 23, 49, -123, -71)
@@ -240,11 +360,50 @@ def frame():
     f += cradle_plate_x(65.5, +1, -85.5, 0, -123, -66, zb, 12)
     # lower-lid servo (horn plane x=-58); ears on face x=-69
     f += cradle_plate_x(-69, -1, -85.5, 0, -123, -66, zb, 12)
-    # base mounting holes
+    # base mounting holes (to stand it on a shelf instead)
     for x in (-80, 80):
-        for y in (-115, 50):
-            f -= cyl_z(2.2, zb - 6, zb + 1, x=x, y=y)
+        for y in (-115, 40):
+            f -= cyl_z(2.2, zb - BASE_T - 1, zb + 1, x=x, y=y)
+    f += window_mount()
+    return lighten(f)
+
+def lighten(f):
+    """Lattice cut-outs in the base, the rear (servo) wall, the front plate and the gussets.
+    Each plate stays solid wherever something else joins it."""
+    zb = -H
+    keep = f.slice(zb + 0.5)                                       # everything standing on the base
+    for x in (-80, 80):
+        for y in (-115, 40):
+            keep += circle(6, x, y)
+    holes = lattice_holes(rect(-90, 90, REAR_Y, Y_GLASS - PLATE_T), keep)
+    f -= holes.extrude(BASE_T + 2).translate([0, 0, zb - BASE_T - 1])
+    # rear wall: servo cradles and the stalk pedestal join it
+    keep = section_xz(f, REAR_Y + BASE_T + 0.5)
+    f -= xz_slab(lattice_holes(rect(-90, 90, zb, 35), keep), REAR_Y - 1, REAR_Y + BASE_T + 0.01)
+    # front plate: the view-hole bezel, ribs, cup housing and gussets join it
+    keep = section_xz(f, Y_GLASS - PLATE_T - 0.5)
+    region = front_outline() - arch(VIEW_R + RIB) - arch(CUP_POCKET_R + CUP_WALL, 0, CUP_Z)
+    f -= xz_slab(lattice_holes(region, keep, border=4), Y_GLASS - PLATE_T - 0.01, Y_GLASS + 1)
+    # side walls standing on the base: gussets, servo cradles, lid uprights, pedestal walls
+    for x0, x1, y0, y1, z1 in YZ_WALLS:
+        f = lighten_yz(f, x0, x1, y0, y1, zb + 0.01, z1)
     return f
+
+# (x0, x1, y0, y1, top z) of each wall in the YZ plane that gets a lattice
+YZ_WALLS = [(86, 90, -41, Y_GLASS - PLATE_T, 41), (-90, -86, -41, Y_GLASS - PLATE_T, 41),   # gussets
+            (23, 27, -123, -71, -15), (45, 49, -123, -71, -15),                             # pan cradle
+            (-21, -17, -123, -66, 32),                                                      # tilt cradle
+            (65.5, 69.5, -123, -66, 12), (-73, -69, -123, -66, 12),                         # lid cradles
+            (60.5, 65.5, -30, 30, 12), (-65.5, -60.5, -30, 30, 12),                         # lid uprights
+            (4.5, 7.5, -123, -56, -14), (-7.5, -4.5, -123, -56, -14)]                       # pedestal walls
+
+def lighten_yz(f, x0, x1, y0, y1, z0, z1):
+    """Lattice through one wall in the YZ plane, kept solid wherever a neighbour touches it."""
+    win = box(x0, x1, y0, y1, z0, z1)
+    region = section_yz(f ^ win, (x0 + x1) / 2)
+    keep = section_yz(f, x0 - 0.5) + section_yz(f, x1 + 0.5)
+    holes = lattice_holes(region, keep, border=4)
+    return f - yz_slab(holes, x0 - 0.01, x1 + 0.01) if not holes.is_empty() else f
 
 # ---------------- dummy servos for preview ----------------
 def sg90():
@@ -286,7 +445,7 @@ if __name__ == "__main__":
         eye_rear=(rear + rear_boss_supports()).rotate([-90, 0, 0]),   # snap-off boss supports
         eye_rear_nosupport=rear.rotate([-90, 0, 0]),
         yoke=yk, stalk=st.rotate([0, 90, 0]), led_insert=li.rotate([90, 0, 0]),
-        frame=fr, lid_upper=lu, lid_lower=ll)
+        frame=fr, lid_upper=lu, lid_lower=ll, cup_shims=cup_shims())
     for k, v in printable.items():
         bb = v.bounding_box()
         v = v.translate([-(bb[0] + bb[3]) / 2, -(bb[1] + bb[4]) / 2, -bb[2]])
