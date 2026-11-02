@@ -3,6 +3,8 @@
 [← Back to the overview](../README.md) · [Firmware](FIRMWARE.md)
 
 Two boards are supported. Servo pins are the same on both; the LED data pin differs.
+The board mounts on the outside of the frame's side rails; see
+[Printed parts → mounting the ESP32](PRINTED_PARTS.md#mounting-the-esp32).
 
 ## HiLetgo ESP32 OLED WiFi Kit (`eye1`)
 

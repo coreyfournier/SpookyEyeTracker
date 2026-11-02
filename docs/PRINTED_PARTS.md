@@ -20,6 +20,7 @@ lattice frame (left). The frame on its own (right).</i></p>
 - [How the eye lights up](#how-the-eye-lights-up)
 - [Printing](#printing)
 - [Window mount](#window-mount)
+- [Mounting the ESP32](#mounting-the-esp32)
 - [Generating the STLs](#generating-the-stls)
 - [Rendering](#rendering)
 
@@ -29,7 +30,7 @@ lattice frame (left). The frame on its own (right).</i></p>
 
 | File | What it is |
 |------|------------|
-| `frame.stl` | Window plate, cup pocket, base tray, servo cradles, lid pivots and the stalk pedestal, in one piece |
+| `frame.stl` | Window plate, cup pocket, base tray, servo cradles, lid pivots, the stalk pedestal and the side rails the ESP32 mounts on, in one piece |
 | `eye_front.stl` | Front of the eyeball: the glowing white and iris. Twist-locks onto the rear (bayonet with a click detent) |
 | `eye_rear.stl` | Back of the eyeball: the side pivot bosses and the tabs the pan and tilt pushrods pull on |
 | `led_insert.stl` | Funnel that carries the jewel's centre LED to the iris and keeps the ring LEDs' light on the white. Twist-locks into the front of the eye |
@@ -58,6 +59,7 @@ approximate, so check against your prints. Electronics are listed in
 | 2 | M2 / #2 × 6 mm (1/4") coarse-thread self-tapping screws for plastic (ST2.2, pan head) | LED jewel to the LED insert (1.6 mm pilot holes) |
 | 4 | ~1.5 mm steel wire pushrods (or servo linkage kit) | Servo horns to the eye/lid tabs (2.2 mm holes). Z-bend the ends |
 | 4 | M4 screws | Optional: screw the frame down to a shelf instead of hanging it |
+| 4 | M2 or M2.5 screws with 5–8 mm standoffs and nuts | ESP32 board to the side rails (drill the holes to suit your board) |
 
 **Filament**
 
@@ -67,7 +69,7 @@ approximate, so check against your prints. Electronics are listed in
 | `led_insert.stl` | White PLA (reflects the most light into the iris and the white of the eye) |
 | Everything else | Any PLA. Matte is fine. A dark colour makes the frame disappear behind the glass |
 
-Altogether it takes about 600 g: the frame is about 400 g, the eye parts about 170 g.
+Altogether it takes about 600 g: the frame is about 415 g, the eye parts about 170 g.
 
 ## How the eye lights up
 
@@ -112,7 +114,7 @@ infill (or enough walls to fill 3-4 mm) with no supports.**
   bridges.
 - The cup pocket has a 45° chin underneath, so nothing starts in mid-air.
 - The only other overhangs are short bridges (23 mm or less) across the tops of lattice
-  holes and servo pockets.
+  holes and servo pockets, and where the side rails' top rail closes over the truss (16 mm or less).
 
 The frame is 180 × 188 × 217 mm (W × D × H), so it needs a printer with at least 220 mm of
 Z height.
@@ -142,6 +144,24 @@ the bottom of the frame presses against the glass.
 The eye's centre sits 60 mm behind the glass, so the eye and lids never touch it. It can
 turn ±25° inside the 80 mm opening.
 
+## Mounting the ESP32
+
+Each side of the frame has a low truss, 28 mm high, running from the front gusset back to the
+rear wall: two solid 8 mm rails, 20 mm apart centre to centre, with diagonal lattice between
+them. It does two jobs:
+- **It stiffens the frame.** Without it, the front (cup) half and the rear (servo) half meet
+  only through the thin base plate just behind the eye, which flexes like a hinge. The rails
+  make that joint about 130 times stiffer.
+- **It holds the controller.** Hold the board flat against the outside of either side, with
+  its mounting holes over the two rails, mark them and drill through. Any board whose two
+  rows of holes are 13–27 mm apart lands on the rails, so this fits the Feather (17.8 mm),
+  the HiLetgo OLED kit (about 21 mm) and most DevKit-style boards. Along the rails you can
+  put it anywhere, so the board's length doesn't matter.
+
+Use M2 or M2.5 screws with standoffs (5–8 mm) so the header pins and parts on the back of the
+board clear the rails. With the board on the outside, the HiLetgo's OLED stays visible and the
+USB port stays reachable.
+
 ## Generating the STLs
 
 ```powershell
@@ -169,6 +189,7 @@ Main settings at the top of each section of `build.py`:
 | `CUP_Z` | 97 mm | Suction cup height above the eye's centre |
 | `RIB`, `LATTICE` | 3 mm, 24 mm | Lattice rib width and spacing |
 | `BASE_T` | 4 mm | Base and rear (servo) wall thickness |
+| `RAIL_W`, `RAIL_PITCH` | 8 mm, 20 mm | Side rail height and centre-to-centre spacing (the ESP32 mount) |
 
 ## Rendering
 

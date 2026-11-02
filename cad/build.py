@@ -399,7 +399,24 @@ def frame():
         for y in (-115, 40):
             f -= cyl_z(2.2, zb - BASE_T - 1, zb + 1, x=x, y=y)
     f += window_mount()
-    return lighten(f)
+    return lighten(f) + side_rails()
+
+# Side rails: a low truss along each side, from the front gussets back into the rear wall. They tie
+# the front (cup) half of the frame to the rear (servo) half, which otherwise meet only through
+# the thin base plate behind the eye, and they're where the ESP32 board mounts: its holes are
+# drilled through the two solid rails, so any board with hole rows RAIL_PITCH +- 7mm apart fits.
+RAIL_W = 8.0                  # height of each solid rail
+RAIL_PITCH = 20.0             # rail centre to rail centre
+RAIL_Y0, RAIL_Y1 = REAR_Y + BASE_T - 0.01, -10.0   # rear wall to well inside the gusset
+
+def side_rails():
+    zb = -H
+    z_top = zb + RAIL_PITCH + RAIL_W                   # 28mm above the base: below the eye and lids
+    holes = lattice_holes(rect(RAIL_Y0, RAIL_Y1, zb + RAIL_W, z_top - RAIL_W), border=0)
+    r = M()
+    for x0 in (86, -90):
+        r += box(x0, x0 + 4, RAIL_Y0, RAIL_Y1, zb, z_top) - yz_slab(holes, x0 - 0.01, x0 + 4.01)
+    return r
 
 def lighten(f):
     """Lattice cut-outs in the base, the rear (servo) wall, the front plate and the gussets.
