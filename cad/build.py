@@ -355,13 +355,14 @@ def window_mount():
     m += xz_slab(arch(VIEW_R + RIB) + keel, Y_GLASS - 10, Y_GLASS - PLATE_T)
     # diagonal ribs behind the plate: carry the cup's pull down to the base corners
     for s in (1, -1):
-        rib = (circle(RIB / 2, s * 30, CUP_Z - 20) + circle(RIB / 2, s * 86, -H + 2)).hull()
+        rib = (circle(RIB / 2, s * 30, CUP_Z - 20) + circle(RIB / 2, s * 86, -H + RIB / 2 - 0.5)).hull()   # foot on the base
         m += xz_slab(rib, Y_GLASS - 14, Y_GLASS - PLATE_T)
     m -= view + pocket                               # ribs and bezel never cross the openings
-    # side gussets: triangles tying the front plate to the base along both outer edges
+    # side gussets: triangles tying the front plate to the base. They stand in the plane of the
+    # lid pivot uprights and merge with them, so each side is one wall (see side_rails)
     gusset = CS([[(Y_GLASS - PLATE_T, -H), (Y_GLASS - PLATE_T, 40), (-40, -H)]])
-    for x0 in (86, -90):
-        m += yz_slab(gusset, x0, x0 + 4)
+    for x0, x1 in UPRIGHT_X:
+        m += yz_slab(gusset, x0, x1)
     return m
 
 def cup_shims():
@@ -371,10 +372,12 @@ def cup_shims():
         s += (cyl_z(10, 0, t) - cyl_z(STUD_R, -1, t + 1)).translate([i * 24, 0, 0])
     return s
 
+UPRIGHT_X = ((60.5, 65.5), (-65.5, -60.5))   # lid pivot uprights (and the gussets in line with them)
+
 def frame():
     zb = -H
     f = box(-90, 90, REAR_Y, Y_GLASS - PLATE_T, zb - BASE_T, zb)    # base plate
-    for x0, x1 in ((60.5, 65.5), (-65.5, -60.5)):                   # lid pivot uprights
+    for x0, x1 in UPRIGHT_X:                                        # lid pivot uprights
         up = M.batch_hull([box(x0, x1, -30, 30, zb, zb + 1), box(x0, x1, -12, 12, -1, 0),
                            cyl_x(12, x0, x1)])
         f += up - cyl_x(TAP, x0 - 1, x1 + 1)
@@ -399,37 +402,55 @@ def frame():
         for y in (-115, 40):
             f -= cyl_z(2.2, zb - BASE_T - 1, zb + 1, x=x, y=y)
     f += window_mount()
-    return lighten(f) + side_rails()
+    rails = side_rails()
+    return lighten(f, rails) + rails
 
-# Side rails: a low truss along each side, from the front gussets back into the rear wall. They tie
-# the front (cup) half of the frame to the rear (servo) half, which otherwise meet only through
-# the thin base plate behind the eye, and they're where the ESP32 board mounts: its holes are
-# drilled through the two solid rails, so any board with hole rows RAIL_PITCH +- 7mm apart fits.
+# Side rails: a low truss along each side that joins the gusset and lid pivot upright at the front
+# to the lid servo cradle at the back (and through it the rear wall), so each side of the frame is
+# one continuous wall. Without it the front (cup) half and the rear (servo) half meet only through
+# the thin base plate behind the eye. The uprights and cradles aren't in line, so the truss bends
+# in a smooth S between them. Outboard of the straight rear run there's a bay inside the base's
+# footprint for the ESP32 board: drill its holes through the two solid rails (any board whose
+# hole rows are RAIL_PITCH +- 7mm apart fits).
 RAIL_W = 8.0                  # height of each solid rail
 RAIL_PITCH = 20.0             # rail centre to rail centre
-RAIL_Y0, RAIL_Y1 = REAR_Y + BASE_T - 0.01, -10.0   # rear wall to well inside the gusset
+RAIL_T = 4.0                  # wall thickness
+RAIL_Y0, RAIL_Y1 = REAR_Y + BASE_T - 0.01, -10.0   # rear wall to well inside the gusset/upright
+BEND_Y0, BEND_Y1 = -48.0, -30.0                    # the S-bend from the cradle's line to the upright's
+# wall centre x at the rear (on the lid servo cradle) and at the front (on the upright), per side
+RAIL_X = ((67.5, 63.0), (-71.0, -63.0))
 
 def side_rails():
     zb = -H
     z_top = zb + RAIL_PITCH + RAIL_W                   # 28mm above the base: below the eye and lids
     holes = lattice_holes(rect(RAIL_Y0, RAIL_Y1, zb + RAIL_W, z_top - RAIL_W), border=0)
     r = M()
-    for x0 in (86, -90):
-        r += box(x0, x0 + 4, RAIL_Y0, RAIL_Y1, zb, z_top) - yz_slab(holes, x0 - 0.01, x0 + 4.01)
+    for x_rear, x_front in RAIL_X:
+        def xc(y):   # centre line: straight, a cosine S-bend, straight
+            t = np.clip((y - BEND_Y0) / (BEND_Y1 - BEND_Y0), 0, 1)
+            return x_rear + (x_front - x_rear) * (1 - np.cos(np.pi * t)) / 2
+        ys = [RAIL_Y0] + list(np.linspace(BEND_Y0, BEND_Y1, 10)) + [RAIL_Y1]
+        w = M()   # hull consecutive thin slices, so the bend is a smooth slanted wall
+        for ya, yb in zip(ys, ys[1:]):
+            w += M.batch_hull([box(xc(y) - RAIL_T / 2, xc(y) + RAIL_T / 2, y, y + 0.01, zb, z_top)
+                               for y in (ya, yb - 0.01)])
+        x0, x1 = min(x_rear, x_front) - 5, max(x_rear, x_front) + 5
+        r += w - yz_slab(holes, x0, x1)
     return r
 
-def lighten(f):
-    """Lattice cut-outs in the base, the rear (servo) wall, the front plate and the gussets.
-    Each plate stays solid wherever something else joins it."""
+def lighten(f, extra=M()):
+    """Lattice cut-outs in the base, the rear (servo) wall, the front plate and the side walls.
+    Each plate stays solid wherever something else joins it, including `extra` (parts added
+    afterwards, already latticed: the side rails)."""
     zb = -H
-    keep = f.slice(zb + 0.5)                                       # everything standing on the base
+    keep = f.slice(zb + 0.5) + extra.slice(zb + 0.5)               # everything standing on the base
     for x in (-80, 80):
         for y in (-115, 40):
             keep += circle(6, x, y)
     holes = lattice_holes(rect(-90, 90, REAR_Y, Y_GLASS - PLATE_T), keep)
     f -= holes.extrude(BASE_T + 2).translate([0, 0, zb - BASE_T - 1])
-    # rear wall: servo cradles and the stalk pedestal join it
-    keep = section_xz(f, REAR_Y + BASE_T + 0.5)
+    # rear wall: servo cradles, the stalk pedestal and the side rails join it
+    keep = section_xz(f + extra, REAR_Y + BASE_T + 0.5)
     f -= xz_slab(lattice_holes(rect(-90, 90, zb, 35), keep), REAR_Y - 1, REAR_Y + BASE_T + 0.01)
     # front plate: the view-hole bezel, ribs, cup housing and gussets join it
     keep = section_xz(f, Y_GLASS - PLATE_T - 0.5)
@@ -441,18 +462,20 @@ def lighten(f):
     return f
 
 # (x0, x1, y0, y1, top z) of each wall in the YZ plane that gets a lattice
-YZ_WALLS = [(86, 90, -41, Y_GLASS - PLATE_T, 41), (-90, -86, -41, Y_GLASS - PLATE_T, 41),   # gussets
+YZ_WALLS = [(60.5, 65.5, -41, Y_GLASS - PLATE_T, 41), (-65.5, -60.5, -41, Y_GLASS - PLATE_T, 41),  # gusset + upright
             (23, 27, -123, -71, -15), (45, 49, -123, -71, -15),                             # pan cradle
             (-21, -17, -123, -66, 32),                                                      # tilt cradle
             (65.5, 69.5, -123, -66, 12), (-73, -69, -123, -66, 12),                         # lid cradles
-            (60.5, 65.5, -30, 30, 12), (-65.5, -60.5, -30, 30, 12),                         # lid uprights
             (4.5, 7.5, -123, -56, -14), (-7.5, -4.5, -123, -56, -14)]                       # pedestal walls
 
 def lighten_yz(f, x0, x1, y0, y1, z0, z1):
-    """Lattice through one wall in the YZ plane, kept solid wherever a neighbour touches it."""
+    """Lattice through one wall in the YZ plane, kept solid wherever a neighbour touches it
+    (and round the lid pivot, where a wall carries one)."""
     win = box(x0, x1, y0, y1, z0, z1)
     region = section_yz(f ^ win, (x0 + x1) / 2)
-    keep = section_yz(f, x0 - 0.5) + section_yz(f, x1 + 0.5)
+    # + a diamond round the lid pivot (y=z=0): its 45 deg underside gives the holes below sloped
+    # ceilings (a circle's flat bottom would leave them overhanging)
+    keep = section_yz(f, x0 - 0.5) + section_yz(f, x1 + 0.5) + CS.square([24, 24], center=True).rotate(45)
     holes = lattice_holes(region, keep, border=4)
     return f - yz_slab(holes, x0 - 0.01, x1 + 0.01) if not holes.is_empty() else f
 

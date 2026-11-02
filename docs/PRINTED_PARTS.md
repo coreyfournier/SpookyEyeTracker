@@ -146,21 +146,26 @@ turn ±25° inside the 80 mm opening.
 
 ## Mounting the ESP32
 
-Each side of the frame has a low truss, 28 mm high, running from the front gusset back to the
-rear wall: two solid 8 mm rails, 20 mm apart centre to centre, with diagonal lattice between
-them. It does two jobs:
+Each side of the frame is one continuous wall. At the front, the gusset that ties the window
+plate to the base stands in line with the lid pivot upright and merges with it. Behind the eye a
+low truss, 28 mm high, carries it back to the lid servo cradle and the rear wall: two solid
+8 mm rails, 20 mm apart centre to centre, with diagonal lattice between them. The uprights and
+cradles aren't in line (4.5 mm apart on the right and 8 mm on the left), so the truss bends in a
+smooth S just behind the eye. The wall does two jobs:
 - **It stiffens the frame.** Without it, the front (cup) half and the rear (servo) half meet
-  only through the thin base plate just behind the eye, which flexes like a hinge. The rails
-  make that joint about 130 times stiffer.
-- **It holds the controller.** Hold the board flat against the outside of either side, with
-  its mounting holes over the two rails, mark them and drill through. Any board whose two
-  rows of holes are 13–27 mm apart lands on the rails, so this fits the Feather (17.8 mm),
-  the HiLetgo OLED kit (about 21 mm) and most DevKit-style boards. Along the rails you can
-  put it anywhere, so the board's length doesn't matter.
+  only through the thin base plate just behind the eye, which flexes like a hinge. The wall
+  makes that joint about 130 times stiffer.
+- **It holds the controller, inside the frame.** Between each wall's straight rear run and the
+  edge of the base there's a bay 17 mm (left) to 20 mm (right) deep. Hold the board flat against
+  the outside of the rails, mark its mounting holes and drill through. Any board whose two rows
+  of holes are 13–27 mm apart lands on the rails, so this fits the Feather (17.8 mm), the HiLetgo
+  OLED kit (about 21 mm) and most DevKit-style boards. The straight run is 75 mm long, so the
+  board's length doesn't matter.
 
 Use M2 or M2.5 screws with standoffs (5–8 mm) so the header pins and parts on the back of the
-board clear the rails. With the board on the outside, the HiLetgo's OLED stays visible and the
-USB port stays reachable.
+board clear the rails. A 51 × 26 mm board on 6 mm standoffs still sits inside the base's
+footprint on either side, clear of the lid servos above it. The HiLetgo's OLED faces out to the
+side, and its USB port stays reachable.
 
 ## Generating the STLs
 
@@ -189,7 +194,8 @@ Main settings at the top of each section of `build.py`:
 | `CUP_Z` | 97 mm | Suction cup height above the eye's centre |
 | `RIB`, `LATTICE` | 3 mm, 24 mm | Lattice rib width and spacing |
 | `BASE_T` | 4 mm | Base and rear (servo) wall thickness |
-| `RAIL_W`, `RAIL_PITCH` | 8 mm, 20 mm | Side rail height and centre-to-centre spacing (the ESP32 mount) |
+| `RAIL_W`, `RAIL_PITCH` | 8 mm, 20 mm | Side wall rail height and centre-to-centre spacing (the ESP32 mount) |
+| `RAIL_X` | right 67.5 → 63, left −71 → −63 | Side wall centre line at the servo cradle and at the lid upright (the S-bend joins them) |
 
 ## Rendering
 
