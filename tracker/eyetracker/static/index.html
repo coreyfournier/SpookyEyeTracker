@@ -16,6 +16,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }   /* beats .field / .row display: flex */
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
   header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 1px solid var(--line);
            background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
@@ -61,6 +62,9 @@
   input[type=number], input[type=text], select { background: var(--bg); color: var(--text); border: 1px solid var(--line);
     border-radius: 6px; padding: 4px 6px; font: inherit; width: 90px; }
   input[type=text] { width: 180px; }
+  input[readonly] { opacity: .65; cursor: not-allowed; }
+  select[data-new] { width: auto; max-width: 100%; }
+  input[data-path="url"] { width: 100%; max-width: 420px; }
   input[type=number]:invalid { border-color: #e5484d; }
   input[type=color] { width: 44px; height: 28px; border: 1px solid var(--line); border-radius: 6px; background: none; padding: 0; }
   .vec { display: flex; gap: 4px; } .vec input { width: 70px; }
@@ -114,7 +118,12 @@ const $ = (s, el = document) => el.querySelector(s);
 const api = async (path, body) => {
   const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(body)});
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) {   // show the server's message, not the JSON around it
+    const text = await r.text();
+    let detail = text;
+    try { detail = JSON.parse(text).detail ?? text; } catch { /* not JSON */ }
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  }
   return r.json();
 };
 let config = null, state = null;
@@ -282,6 +291,9 @@ function buildForm(obj, path = [], skip = new Set(), scope = '') {
       applyLimits(scope, id, input, $('label', row), false);
     } else {
       input = Object.assign(document.createElement('input'), {type: 'text', value: v ?? ''});
+      // chosen when the camera is added: its other fields depend on it
+      if (scope === 'camera' && id === 'type') Object.assign(input, {readOnly: true,
+        title: 'Set when the camera is added. To change it, remove the camera and add it again.'});
     }
     input.dataset.path = id;
     row.appendChild(input);
@@ -299,7 +311,9 @@ function buildForm(obj, path = [], skip = new Set(), scope = '') {
 const FLATTEN = new Set(['firmware', 'firmware.behaviors']);
 const GROUPS = {
   eye: {placement: ['position', 'heading', 'pitch']},
-  camera: {connection: ['ip', 'ip_env', 'rtsp_port', 'channel', 'enabled'], placement: ['position', 'heading', 'pitch', 'roll', 'hfov']},
+  camera: {connection: ['type', 'ip', 'ip_env', 'rtsp_port', 'channel', 'onvif_port', 'profile', 'url', 'device', 'width',
+                        'height', 'username_env', 'password_env', 'enabled'],
+           placement: ['position', 'heading', 'pitch', 'roll', 'hfov']},
 };
 const SECTION_TITLES = {
   general: 'General', connection: 'Connection', placement: 'Position & direction', aim: 'Aim correction',
@@ -675,28 +689,131 @@ async function boot() {
     $('.row', card).appendChild(del);
     $('#cameraForms').appendChild(card);
   }
-  const MAX_CAMERAS = 2;
-  const add = document.createElement('div');
-  add.className = 'card';
-  add.innerHTML = config.cameras.length >= MAX_CAMERAS
-    ? `<h2>Cameras</h2><div class="msg">The maximum of ${MAX_CAMERAS} cameras is configured. Remove one to add another.</div>`
-    : `<h2>Add a camera <small>${config.cameras.length} of ${MAX_CAMERAS}</small></h2>
-       <div class="field"><label>id</label><input type="text" data-new-id value="camera${config.cameras.length + 1}"></div>
-       <div class="field"><label>ip</label><input type="text" data-new-ip placeholder="192.168.4.70"></div>
-       <div class="hint">Hikvision RTSP on port 554 using the shared credentials. Set its position and heading after adding.</div>
-       <div class="row"><button class="btn primary" data-add>Add camera</button><span class="msg"></span></div>`;
-  $('[data-add]', add)?.addEventListener('click', async () => {
-    const cam = {id: $('[data-new-id]', add).value.trim(), ip: $('[data-new-ip]', add).value.trim(), ip_env: '',
-      rtsp_port: 554, channel: 101, enabled: true, position: [0, 0, 3], heading: 0, pitch: -15, roll: 0, hfov: 90};
-    try { await api('/api/cameras', cam); location.reload(); }
-    catch (e) { $('.msg', add).textContent = 'Error: ' + e.message; }
-  });
-  $('#cameraForms').appendChild(add);
+  $('#cameraForms').appendChild(addCameraCard());
   const settings = {world: config.world, tracking: config.tracking, director: config.director, detection: config.detection};
   $('#settings').replaceWith(Object.assign(simpleCard('Tracking settings', settings, new Set(), async s => {
     await api('/api/settings/save', s); Object.assign(config, s);
   }, 'settings', 'settings'), {id: 'settings'}));
   resizeMap();
+}
+
+// ---------- Add camera ----------
+// Pick the camera type, then its connection fields. ONVIF cameras can be found on the network
+// and asked for their stream profiles; USB cameras can be listed. Pose is set after adding.
+const CAMERA_HINTS = {
+  onvif: `Most IP cameras (Dahua, Reolink, Amcrest, Axis, Hikvision, …). The tracker asks the camera for its
+    stream address. Uses the login in .env (CAMERA_USERNAME / CAMERA_PASSWORD) unless you name other variables.
+    On Hikvision, ONVIF must be enabled and usually needs its own user.`,
+  hikvision: 'Hikvision RTSP on port 554 using the shared login in .env. Channel 101 is the main stream.',
+  rtsp: `Any camera's stream address. {user}, {password} and {ip} are filled in from .env, so the password stays
+    out of the config.`,
+  usb: `A webcam plugged into the PC running the tracker. In Docker, the device must be passed into the
+    container (see docs/TRACKER.md).`,
+};
+function addCameraCard() {
+  const MAX_CAMERAS = 2, n = config.cameras.length;
+  const add = document.createElement('div');
+  add.className = 'card';
+  if (n >= MAX_CAMERAS) {
+    add.innerHTML = `<h2>Cameras</h2><div class="msg">The maximum of ${MAX_CAMERAS} cameras is configured. Remove one to add another.</div>`;
+    return add;
+  }
+  add.innerHTML = `<h2>Add a camera <small>${n} of ${MAX_CAMERAS}</small></h2>
+    <div class="field"><label>type</label><select data-new="type">
+      <option value="onvif">ONVIF (most IP cameras)</option><option value="hikvision">Hikvision</option>
+      <option value="rtsp">Other stream (RTSP URL)</option><option value="usb">USB camera on this PC</option></select></div>
+    <div class="hint" data-hint></div>
+    <div class="field"><label>id</label><input type="text" data-new="id" value="camera${n + 1}"></div>
+    <div class="field" data-kind="onvif hikvision"><label>ip</label><input type="text" data-new="ip" placeholder="192.168.4.70"></div>
+    <div class="field" data-kind="onvif"><label>ONVIF port</label><input type="number" data-new="onvif_port" value="80" min="1" max="65535"></div>
+    <div class="field" data-kind="onvif"><label>username env</label><input type="text" data-new="username_env"
+      placeholder="${config.credentials?.username_env || 'CAMERA_USERNAME'}"></div>
+    <div class="field" data-kind="onvif"><label>password env</label><input type="text" data-new="password_env"
+      placeholder="${config.credentials?.password_env || 'CAMERA_PASSWORD'}"></div>
+    <div class="row" data-kind="onvif"><button class="btn" data-find-onvif>Find cameras</button>
+      <button class="btn" data-profiles>Load stream profiles</button></div>
+    <div class="field" data-kind="onvif"><label>stream</label><select data-new="profile"><option value="">highest resolution</option></select></div>
+    <div class="field" data-kind="hikvision"><label>channel</label><select data-new="channel">
+      <option value="101">101 (main stream)</option><option value="102">102 (sub stream)</option></select></div>
+    <div class="field" data-kind="rtsp"><label>url</label><input type="text" data-new="url" style="width:100%;max-width:420px"
+      placeholder="rtsp://{user}:{password}@192.168.4.70:554/stream1"></div>
+    <div class="field" data-kind="usb"><label>device</label><input type="number" data-new="device" value="0" min="0" max="9">
+      <button class="btn" data-find-usb>Find USB cameras</button></div>
+    <div class="field" data-kind="usb"><label>resolution</label><span class="vec"><input type="number" data-new="width" value="1280">
+      <input type="number" data-new="height" value="720"></span></div>
+    <div data-found></div>
+    <div class="row"><button class="btn primary" data-add>Add camera</button><span class="msg"></span></div>`;
+  const val = k => $(`[data-new="${k}"]`, add).value.trim();
+  const set = (k, v) => { $(`[data-new="${k}"]`, add).value = v; };
+  const msg = $('.msg', add), found = $('[data-found]', add), type = $('[data-new="type"]', add);
+  const showType = () => {
+    add.querySelectorAll('[data-kind]').forEach(el => el.hidden = !el.dataset.kind.split(' ').includes(type.value));
+    $('[data-hint]', add).textContent = CAMERA_HINTS[type.value].replace(/\s+/g, ' ');
+    found.innerHTML = '';
+    msg.textContent = '';
+  };
+  type.onchange = showType;
+  showType();
+  // what a search found: a row of buttons that fill in the form
+  const offer = (items, label, pick) => {
+    found.innerHTML = '';
+    for (const it of items) {
+      const b = Object.assign(document.createElement('button'), {className: 'btn', textContent: label(it), disabled: !!it.in_use});
+      b.style.margin = '2px';
+      b.onclick = () => { found.innerHTML = ''; pick(it); };
+      found.appendChild(b);
+    }
+  };
+  const loadProfiles = async () => {
+    msg.textContent = 'Asking the camera for its streams…';
+    try {
+      const r = await api('/api/onvif/profiles', {ip: val('ip'), onvif_port: +val('onvif_port') || 80,
+        username_env: val('username_env'), password_env: val('password_env')});
+      const best = r.profiles.reduce((a, p) => p.width * p.height > a.width * a.height ? p : a);
+      $('[data-new="profile"]', add).innerHTML = r.profiles.map(p =>
+        `<option value="${p.token}" ${p === best ? 'selected' : ''}>${p.name || p.token} — ${p.width}×${p.height} ` +
+        `${p.encoding}${p.fps ? ` · ${p.fps} fps` : ''}</option>`).join('');
+      msg.textContent = `${r.profiles.length} stream(s) found ✓`;
+    } catch (e) { msg.textContent = 'Error: ' + e.message; }
+  };
+  $('[data-profiles]', add).onclick = loadProfiles;
+  $('[data-find-onvif]', add).onclick = async () => {
+    msg.textContent = 'Looking for ONVIF cameras…';
+    try {
+      const r = await api('/api/onvif/discover');
+      msg.textContent = r.cameras.length ? 'Pick one:' : 'No ONVIF cameras answered. Check ONVIF is enabled on the camera, ' +
+        "or type its IP (discovery doesn't reach out of Docker unless it uses host networking).";
+      offer(r.cameras, c => `${[c.name, c.hardware].filter(Boolean).join(' ') || 'camera'} · ${c.ip}:${c.port}`, c => {
+        set('ip', c.ip);
+        set('onvif_port', c.port);
+        loadProfiles();
+      });
+    } catch (e) { msg.textContent = 'Error: ' + e.message; }
+  };
+  $('[data-find-usb]', add).onclick = async () => {
+    msg.textContent = 'Looking for USB cameras…';
+    try {
+      const r = await api('/api/usb/devices');
+      msg.textContent = r.devices.length ? 'Pick one:' : 'No USB cameras found on the PC running the tracker.';
+      offer(r.devices, d => `Camera ${d.device}${d.in_use ? ' (in use)' : ` · ${d.width}×${d.height}`}`, d => set('device', d.device));
+    } catch (e) { msg.textContent = 'Error: ' + e.message; }
+  };
+  $('[data-add]', add).onclick = async () => {
+    const kind = type.value, cam = {id: val('id'), type: kind, enabled: true};
+    if (kind === 'onvif') {
+      Object.assign(cam, {ip: val('ip'), ip_env: '', onvif_port: +val('onvif_port') || 80, profile: val('profile')});
+      if (val('username_env')) cam.username_env = val('username_env');
+      if (val('password_env')) cam.password_env = val('password_env');
+    } else if (kind === 'hikvision') Object.assign(cam, {ip: val('ip'), ip_env: '', rtsp_port: 554, channel: +val('channel')});
+    else if (kind === 'rtsp') cam.url = val('url');
+    else Object.assign(cam, {device: +val('device'), width: +val('width'), height: +val('height')});
+    // a starting pose to correct later (or let the camera calibration wizard work it out)
+    Object.assign(cam, kind === 'usb' ? {position: [0, 0, 1.5], heading: 0, pitch: 0, roll: 0, hfov: 70}
+      : {position: [0, 0, 3], heading: 0, pitch: -15, roll: 0, hfov: 90});
+    try { await api('/api/cameras', cam); location.reload(); }
+    catch (e) { msg.textContent = 'Error: ' + e.message; }
+  };
+  return add;
 }
 
 // Pick up eye changes made elsewhere (e.g. the calibration page) unless the form has unsaved edits.
@@ -723,7 +840,8 @@ async function poll() {
     for (const c of state.cameras) {
       chips.push(`<span class="chip"><span class="dot ${c.connected ? 'ok' : 'bad'}"></span>${c.id} ${c.detect_fps} fps</span>`);
       const el = document.querySelector(`[data-cam="${c.id}"] [data-camstat]`);
-      if (el) el.textContent = c.connected ? `${c.size[0]}×${c.size[1]} · read ${c.read_fps} fps · detect ${c.detect_fps} fps · ${c.people} people` : 'connecting…';
+      if (el) el.textContent = c.connected ? `${c.size[0]}×${c.size[1]} · read ${c.read_fps} fps · detect ${c.detect_fps} fps · ${c.people} people`
+        : c.error || 'connecting…';
     }
     for (const [id, st] of Object.entries(state.eyes)) {
       const fw = fwInfo(st), stale = fw && fw.short;

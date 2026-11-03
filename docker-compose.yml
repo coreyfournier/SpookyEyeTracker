@@ -11,6 +11,12 @@ services:
     env_file: .env                 # CAMERA_USERNAME, CAMERA_PASSWORD, LEFT_TO_RIGHT_IP, ...
     ports:
       - "8080:8080"
+    # Linux only: "Find cameras" (ONVIF discovery) needs the host network - add the line below
+    # and drop `ports:`. Without it, add ONVIF cameras by IP.
+    # network_mode: host
+    # Linux only: pass a USB webcam in (Docker Desktop on Windows can't; run the tracker directly).
+    # devices:
+    #   - /dev/video0:/dev/video0
     volumes:
       - ./tracker-data:/config     # config.yaml + calibration.json (created on first run)
     deploy:

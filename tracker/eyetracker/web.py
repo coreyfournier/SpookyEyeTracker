@@ -9,7 +9,8 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .config import MAX_CAMERAS, ConfigError
+from . import onvif
+from .config import MAX_CAMERAS, ConfigError, camera_ip, camera_login
 from .geometry import DEFAULT_AIM
 from .ota import OtaError, detect_board, ota_password, upload as ota_upload
 from .version import firmware_status, latest_firmware_version
@@ -242,6 +243,38 @@ def create_app(store, world, link, director, cameras, calib, camcal=None) -> Fas
             raise HTTPException(404, f"unknown camera {cam_id}")
         cameras.sync()
         return {"deleted": True}
+
+    # ---------- finding cameras (Add camera card) ----------
+    @app.get("/api/onvif/discover")
+    def onvif_discover():
+        """ONVIF cameras that answer a discovery probe on the local network."""
+        try:
+            return {"cameras": onvif.discover()}
+        except OSError as e:
+            raise HTTPException(502, f"discovery failed: {e}") from e
+
+    @app.post("/api/onvif/profiles")
+    def onvif_profiles(body: dict = Body(...)):
+        """A camera's ONVIF stream profiles, using the login from .env (shared, or the camera's own
+        username_env / password_env)."""
+        cam = {"ip": body.get("ip", ""), "ip_env": body.get("ip_env", ""),
+               "username_env": body.get("username_env", ""), "password_env": body.get("password_env", "")}
+        if not camera_ip(cam):
+            raise HTTPException(400, "ip required")
+        user, pw = camera_login(cam, store.section("credentials"))
+        try:
+            return {"profiles": onvif.Camera(camera_ip(cam), body.get("onvif_port", 80), user, pw).profiles()}
+        except onvif.OnvifError as e:
+            raise HTTPException(502, str(e)) from e
+
+    @app.get("/api/usb/devices")
+    def usb_devices():
+        """USB cameras this PC can open (ones a running camera already holds are marked in use)."""
+        from .camera import list_usb_cameras   # imported here: it loads OpenCV
+        from .config import usb_device
+        busy = {usb_device(c) for c in store.section("cameras") or []
+                if c.get("type") == "usb" and cameras.get(c["id"]) is not None}
+        return {"devices": list_usb_cameras(skip=busy)}
 
     @app.post("/api/settings/save")
     def save_settings(body: dict = Body(...)):

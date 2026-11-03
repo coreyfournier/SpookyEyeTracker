@@ -21,10 +21,17 @@ credentials:             # names of environment variables (see .env.example)
   username_env: CAMERA_USERNAME
   password_env: CAMERA_PASSWORD
 
-# 0, 1 or 2 cameras (max 2). Each needs `ip` (literal) or `ip_env` (name of an environment
-# variable). Add or remove cameras from the UI's Cameras tab - no restart needed.
+# 0, 1 or 2 cameras (max 2). Add or remove cameras from the UI's Cameras tab - no restart needed.
+# type: hikvision - Hikvision RTSP channels: `ip` (literal) or `ip_env` (name of an environment
+#                   variable), rtsp_port, channel
+#       onvif     - any ONVIF camera, asked for its stream: ip / ip_env, onvif_port (80), profile
+#                   (token; empty = highest resolution)
+#       rtsp      - any stream: url, with {user} {password} {ip} filled in from .env
+#       usb       - a webcam on this PC: device (0 = first), width, height
+# Network cameras log in with the shared `credentials` above, or their own username_env / password_env.
 cameras:
 - id: left_to_right
+  type: hikvision
   ip_env: LEFT_TO_RIGHT_IP
   rtsp_port: 554
   channel: 101           # 101 = main stream, 102 = sub stream (sub is only 2 fps on these cameras)
@@ -35,6 +42,7 @@ cameras:
   roll: 0.0
   hfov: 90.0
 - id: right_to_left
+  type: hikvision
   ip_env: RIGHT_TO_LEFT_IP
   rtsp_port: 554
   channel: 101

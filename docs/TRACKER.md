@@ -18,7 +18,8 @@ port 8080, including two phone pages for calibrating while you stand in the yard
 
 ## Requirements
 
-- 1-2 RTSP cameras. It's built for Hikvision; any camera with the same RTSP URL format works.
+- 1-2 cameras of any of these [types](#camera-types): Hikvision, any ONVIF IP camera, any RTSP
+  stream, or a USB webcam plugged into the PC running the tracker.
   Cameras are optional: with none, the eyes still idle, wander and blink, and can be
   calibrated by hand.
 - A PC or server. An NVIDIA GPU runs detection at full camera frame rate (10-15 fps per
@@ -31,9 +32,9 @@ port 8080, including two phone pages for calibrating while you stand in the yard
    `.env` is git-ignored. If the password contains quotes, wrap it in double quotes.
 2. The live config is `tracker-data/config.yaml` (`/config/config.yaml` in Docker). It's
    copied from `tracker/config.default.yaml`, which explains every setting, on first run.
-   - **Cameras:** up to 2. Each camera takes either a literal `ip` or `ip_env` (the name of
-     a variable in `.env`). You can also add and remove cameras on the UI's **Cameras**
-     tab; changes apply without a restart.
+   - **Cameras:** up to 2, of any [type](#camera-types). Network cameras take either a
+     literal `ip` or `ip_env` (the name of a variable in `.env`). It's easiest to add and
+     remove cameras on the UI's **Cameras** tab; changes apply without a restart.
    - **Eyes:** set each eye's `ip`, which is shown on its OLED or in its serial log.
      Reserve it in your router's DHCP so it never changes.
 3. Set `EYE_OTA_PASSWORD` in `.env` to any long random string. It protects over-the-air
@@ -175,7 +176,34 @@ The **Eyes** tab has one card per eye:
 ![Camera settings with add/remove](images/cameras-tab.png)
 
 Each camera's address, stream and pose (position, heading, pitch, roll, field of view) can
-be edited live. Cameras can be added or removed, up to two, without restarting.
+be edited live. Cameras can be added or removed, up to two, without restarting. If a camera
+can't connect, the Live tab says why (for example a refused login, or ONVIF switched off).
+
+#### Camera types
+
+Choose the type in the **Add a camera** card; it shows the fields that type needs.
+
+| Type | For | What you give it |
+|------|-----|------------------|
+| **ONVIF** | Most IP cameras: Dahua, Reolink, Amcrest, Axis, Hikvision and others | The IP and ONVIF port (usually 80). **Find cameras** looks for ONVIF cameras on your network; **Load stream profiles** lists the camera's streams with their resolution. The tracker asks the camera for the stream address each time it connects |
+| **Hikvision** | Hikvision cameras, with ONVIF off | The IP and channel (101 = main stream, 102 = sub stream) |
+| **Other stream** | Any camera with an RTSP address | The full URL. `{user}`, `{password}` and `{ip}` are filled in from `.env`, so the password stays out of the config |
+| **USB** | A webcam plugged into the PC running the tracker | The device number (0 = first; **Find USB cameras** lists them) and the resolution to ask for |
+
+Network cameras log in with `CAMERA_USERNAME` / `CAMERA_PASSWORD` from `.env`. A camera that
+needs a different login (Hikvision usually needs a separate ONVIF user) can name its own
+`.env` variables in **username env** / **password env**.
+
+- **ONVIF on Hikvision is off by default.** Turn it on under Configuration → Network →
+  Advanced Settings → Integration Protocol, and add an ONVIF user there. Until then the
+  tracker reports "has no ONVIF service"; the **Hikvision** type works without it.
+- **Finding cameras from Docker.** ONVIF discovery is a broadcast on the local network, and
+  it doesn't leave Docker's default network. Use `network_mode: host` (Linux), or type the
+  camera's IP; everything else works either way.
+- **USB cameras in Docker** need the device passed into the container (Linux):
+  `devices: ["/dev/video0:/dev/video0"]` under the tracker service in `docker-compose.yml`.
+  Docker Desktop on Windows can't pass webcams through, so run the tracker directly on
+  Windows for a USB camera.
 
 ### Settings
 

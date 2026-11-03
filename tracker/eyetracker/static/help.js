@@ -43,6 +43,21 @@ const FIELD_HELP = L => ({
     "cpu" forces the processor; "0" forces the first NVIDIA GPU.`,
 
   // ---------------- cameras ----------------
+  'camera:type': `How the tracker reaches this camera: "hikvision" (Hikvision's stream channels), "onvif" (any ONVIF
+    camera: it's asked for its stream address), "rtsp" (a stream address you typed) or "usb" (a webcam on this PC).
+    Chosen when the camera is added.`,
+  'camera:onvif_port': 'Port of the camera\'s ONVIF service (its web port, usually 80). Not the video port.',
+  'camera:profile': `Which of the camera's ONVIF streams to use (its profile token, e.g. "Profile_1"). Empty = the
+    highest resolution. The main stream finds people further away; a sub stream uses less CPU.`,
+  'camera:url': `The camera's stream address. {user}, {password} and {ip} are filled in from .env, e.g.
+    rtsp://{user}:{password}@{ip}:554/stream1 - so the password never sits in the config.`,
+  'camera:device': `Which USB camera: 0 is the first one the PC finds, 1 the second… (on Linux a path such as
+    /dev/video2 also works).`,
+  'camera:width': 'Resolution to ask the USB camera for, in pixels. It uses the nearest it supports.',
+  'camera:height': 'Resolution to ask the USB camera for, in pixels.',
+  'camera:username_env': `Name of the .env setting holding this camera's username, if it differs from the shared
+    CAMERA_USERNAME (Hikvision cameras usually need a separate ONVIF user).`,
+  'camera:password_env': 'Name of the .env setting holding this camera\'s password, if it differs from the shared CAMERA_PASSWORD.',
   'camera:ip_env': `Name of a setting in the .env file that holds this camera's IP address (keeps addresses out of the
     config). Leave empty and fill in "ip" instead to type the address here.`,
   'camera:rtsp_port': 'Network port of the camera\'s video stream. Hikvision cameras use 554 unless you changed it.',
@@ -145,6 +160,10 @@ const FIELD_LIMITS = {
   // ---------------- cameras ----------------
   'camera:rtsp_port': [1, 65535, 1],
   'camera:channel': [1, 9999, 1],
+  'camera:onvif_port': [1, 65535, 1],
+  'camera:device': [0, 9, 1],
+  'camera:width': [160, 3840, 1],
+  'camera:height': [120, 2160, 1],
   'camera:heading': [-180, 180],
   'camera:pitch': [-90, 90],
   'camera:roll': [-45, 45],

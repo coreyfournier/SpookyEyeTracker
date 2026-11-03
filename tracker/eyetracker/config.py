@@ -19,6 +19,9 @@ BUNDLED_CONFIG = TRACKER_DIR / "config.default.yaml"   # committed template
 # Live config: $EYETRACKER_CONFIG (Docker: /config/config.yaml), else tracker-data/ (git-ignored).
 DEFAULT_CONFIG = Path(os.environ.get("EYETRACKER_CONFIG", PROJECT_DIR / "tracker-data" / "config.yaml"))
 MAX_CAMERAS = 2
+# How a camera's video is reached: Hikvision's RTSP channels, any ONVIF camera (asked for its RTSP
+# address), any stream URL, or a USB camera on this PC
+CAMERA_TYPES = ("hikvision", "onvif", "rtsp", "usb")
 UNIT_SYSTEMS = ("metric", "imperial")   # display only - the config itself is always metres
 
 load_dotenv(PROJECT_DIR / ".env")
@@ -53,8 +56,15 @@ def validate(cfg: dict) -> list[str]:
     _check_ids(cameras, "camera", errors)
     _check_ids(eyes, "eye", errors)
     for c in cameras:
-        if not (c.get("ip") or c.get("ip_env")):
+        kind = c.get("type", "hikvision")
+        if kind not in CAMERA_TYPES:
+            errors.append(f"camera {c.get('id')}: type must be one of {', '.join(CAMERA_TYPES)} (got {kind!r})")
+        elif kind in ("hikvision", "onvif") and not (c.get("ip") or c.get("ip_env")):
             errors.append(f"camera {c.get('id')}: set ip or ip_env")
+        elif kind == "rtsp" and not str(c.get("url", "")).startswith(("rtsp://", "rtsps://", "http://", "https://")):
+            errors.append(f"camera {c.get('id')}: url must be a stream address (rtsp://...)")
+        elif kind == "usb" and str(c.get("device", "")).strip() == "":
+            errors.append(f"camera {c.get('id')}: set device (0 = the first USB camera)")
         for key in ("position", "heading", "pitch", "hfov"):
             if key not in c:
                 errors.append(f"camera {c.get('id')}: missing {key}")
@@ -82,6 +92,16 @@ def _upgrade_eye(eye: dict) -> None:
         items.insert(i, ("sclera_brightness", iris["brightness"]))
         iris.clear()
         iris.update(items)
+
+
+def _upgrade_camera(cam: dict) -> None:
+    """Cameras from before camera types were all Hikvision: say so, right after the id."""
+    if "type" not in cam:
+        items = list(cam.items())
+        keys = [k for k, _ in items]
+        items.insert(keys.index("id") + 1 if "id" in keys else 0, ("type", "hikvision"))
+        cam.clear()
+        cam.update(items)
 
 
 def ensure_config(path: Path) -> Path:
@@ -114,6 +134,8 @@ class ConfigStore:
         data.setdefault("eyes", [])
         for e in data["eyes"]:
             _upgrade_eye(e)
+        for c in data["cameras"]:
+            _upgrade_camera(c)
         errors = validate(data)
         if errors:
             raise ConfigError(f"{self.path}: " + "; ".join(errors))
@@ -182,13 +204,37 @@ def camera_ip(cam: dict) -> str:
     return (os.environ.get(env) if env else None) or cam.get("ip", "")
 
 
+def camera_login(cam: dict, creds: dict) -> tuple[str, str]:
+    """Username and password from the .env variables named by the camera (username_env /
+    password_env, e.g. a separate ONVIF user), else by the shared credentials section."""
+    user_env = cam.get("username_env") or creds["username_env"]
+    pw_env = cam.get("password_env") or creds["password_env"]
+    return os.environ.get(user_env, ""), os.environ.get(pw_env, "")
+
+
 def rtsp_url(cam: dict, creds: dict) -> str:
-    user = os.environ.get(creds["username_env"], "")
-    pw = os.environ.get(creds["password_env"], "")
+    """Hikvision's RTSP address for a camera's channel (101 = main stream, 102 = sub stream)."""
+    user, pw = camera_login(cam, creds)
     return (f"rtsp://{quote(user, safe='')}:{quote(pw, safe='')}@{camera_ip(cam)}:{cam.get('rtsp_port', 554)}"
             f"/Streaming/Channels/{cam.get('channel', 101)}")
 
 
-def redact(url: str) -> str:
-    pw = os.environ.get("CAMERA_PASSWORD", "")
-    return url.replace(quote(pw, safe=""), "***") if pw else url
+def custom_url(cam: dict, creds: dict) -> str:
+    """A camera's own stream URL, with {user}, {password} and {ip} filled in from the .env."""
+    user, pw = camera_login(cam, creds)
+    return (cam.get("url", "").replace("{user}", quote(user, safe="")).replace("{password}", quote(pw, safe=""))
+            .replace("{ip}", camera_ip(cam)))
+
+
+def usb_device(cam: dict) -> int | str:
+    """USB camera: an index (0 = the first camera) or a device path such as /dev/video2."""
+    d = cam.get("device", 0)
+    return int(d) if isinstance(d, (int, float)) or str(d).strip().isdigit() else str(d)
+
+
+def redact(url: str, *secrets: str) -> str:
+    """Hide passwords in a stream URL before it's logged."""
+    for pw in (os.environ.get("CAMERA_PASSWORD", ""), *secrets):
+        if pw:
+            url = url.replace(quote(pw, safe=""), "***").replace(pw, "***")
+    return url

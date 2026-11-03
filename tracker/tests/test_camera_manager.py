@@ -49,7 +49,7 @@ def test_disable_and_remove_stop_workers(store):
     m.sync()
     assert left.stopped and "left_to_right" not in m.workers
     assert m.statuses()[0] == {"id": "left_to_right", "connected": False, "enabled": False, "read_fps": 0,
-                               "detect_fps": 0, "size": (0, 0), "people": 0}
+                               "detect_fps": 0, "size": (0, 0), "people": 0, "error": ""}
     right = m.workers["right_to_left"]
     store.remove_item("cameras", "right_to_left", save=False)
     m.sync()

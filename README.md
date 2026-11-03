@@ -66,7 +66,8 @@ cameras and the eyes' aim while you stand in the yard. Take the full tour in
   7-LED jewel, four SG90 servos, a 5 V 3 A supply, a large threaded suction cup, a few
   M2/M3 screws and pins, and about 600 g of PLA. Full lists:
   [electronics](docs/FIRMWARE.md#shopping-list), [hardware and filament](docs/PRINTED_PARTS.md#shopping-list).
-- **Once:** 1-2 RTSP cameras (built for Hikvision), and a PC or server to run the tracker.
+- **Once:** 1-2 cameras: Hikvision, any ONVIF IP camera, any RTSP stream, or a USB webcam;
+  and a PC or server to run the tracker.
   An NVIDIA GPU detects at full camera frame rate; CPU-only works, but slower.
 
 ## Getting started

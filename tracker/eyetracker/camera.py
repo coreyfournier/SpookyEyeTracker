@@ -1,8 +1,9 @@
-"""Per-camera RTSP reader + YOLO person detector.
+"""Per-camera video reader + YOLO person detector.
 
 Each camera gets two threads: a reader that always keeps only the newest frame
 (so detection never lags behind a growing buffer) and a detector that runs YOLO
 tracking on that frame and feeds world positions into the World tracker.
+Cameras are Hikvision, ONVIF or plain RTSP network cameras, or USB cameras (see open_source).
 """
 from __future__ import annotations
 
@@ -17,10 +18,60 @@ os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;tcp")
 import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 
-from .config import ConfigStore, redact, rtsp_url  # noqa: E402
+from . import onvif  # noqa: E402
+from .config import (ConfigStore, camera_ip, camera_login, custom_url, redact, rtsp_url,  # noqa: E402
+                     usb_device)
 from .geometry import CameraModel  # noqa: E402
 
 log = logging.getLogger(__name__)
+USB_BACKEND = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY   # DirectShow opens webcams fastest on Windows
+
+
+def stream_source(cam: dict, creds: dict) -> tuple[int | str, str]:
+    """Where to read a camera from, and how to show it in the log (password hidden).
+    ONVIF asks the camera over the network, so it can raise onvif.OnvifError."""
+    kind = cam.get("type", "hikvision")
+    if kind == "usb":
+        dev = usb_device(cam)
+        return dev, f"USB camera {dev}"
+    user, pw = camera_login(cam, creds)
+    if kind == "onvif":
+        url = onvif.Camera(camera_ip(cam), cam.get("onvif_port", 80), user, pw).stream_uri(cam.get("profile", ""))
+    elif kind == "rtsp":
+        url = custom_url(cam, creds)
+    else:
+        url = rtsp_url(cam, creds)
+    return url, redact(url, pw)
+
+
+def open_source(src: int | str, cam: dict):
+    """cv2.VideoCapture for a stream URL or a USB camera (at its configured resolution)."""
+    if isinstance(src, int) or cam.get("type") == "usb":
+        cap = cv2.VideoCapture(src, USB_BACKEND)
+        if cam.get("width") and cam.get("height"):
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, int(cam["width"]))
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, int(cam["height"]))
+        return cap
+    return cv2.VideoCapture(src, cv2.CAP_FFMPEG)
+
+
+def list_usb_cameras(max_index: int = 6, skip=()) -> list[dict]:
+    """USB cameras this PC can open, as [{device, width, height}]. Indices in `skip` (already in
+    use by a running camera, which would block opening them again) are listed without probing."""
+    found = []
+    for i in range(max_index):
+        if i in skip:
+            found.append({"device": i, "width": 0, "height": 0, "in_use": True})
+            continue
+        cap = cv2.VideoCapture(i, USB_BACKEND)
+        try:
+            if cap.isOpened():
+                ok, frame = cap.read()
+                if ok and frame is not None:
+                    found.append({"device": i, "width": frame.shape[1], "height": frame.shape[0], "in_use": False})
+        finally:
+            cap.release()
+    return found
 
 PREVIEW_WIDTH = 960
 
@@ -77,6 +128,7 @@ class CameraWorker:
         self._jpeg_lock = threading.Condition()
         self._stop = threading.Event()
         self.connected = False
+        self.error = ""          # why it isn't connected, for the UI
         self.read_fps = 0.0
         self.detect_fps = 0.0
         self.size = (0, 0)
@@ -101,20 +153,28 @@ class CameraWorker:
             cam = self.store.camera(self.cam_id)
             if cam is None:  # removed from config; the manager stops us
                 return
-            url = rtsp_url(cam, self.store.section("credentials"))
-            log.info("%s: opening %s", self.cam_id, redact(url))
-            cap = cv2.VideoCapture(url, cv2.CAP_FFMPEG)
+            try:
+                src, shown = stream_source(cam, self.store.section("credentials"))
+            except onvif.OnvifError as e:
+                log.warning("%s: %s - retrying in 10s", self.cam_id, e)
+                self.connected, self.error = False, str(e)
+                self._stop.wait(10)
+                continue
+            log.info("%s: opening %s", self.cam_id, shown)
+            cap = open_source(src, cam)
             if not cap.isOpened():
-                log.warning("%s: could not open stream, retrying in 5s", self.cam_id)
-                self.connected = False
+                log.warning("%s: could not open %s, retrying in 5s", self.cam_id, shown)
+                self.connected, self.error = False, f"could not open {shown}"
+                cap.release()
                 self._stop.wait(5)
                 continue
-            self.connected = True
+            self.connected, self.error = True, ""
             n, t0 = 0, time.time()
             while not self._stop.is_set():
                 ok, frame = cap.read()
                 if not ok:
                     log.warning("%s: stream dropped, reconnecting", self.cam_id)
+                    self.error = "stream dropped, reconnecting"
                     break
                 with self._frame_lock:
                     self._frame = frame
@@ -231,7 +291,7 @@ class CameraWorker:
     def status(self) -> dict:
         return {"id": self.cam_id, "enabled": True, "connected": self.connected, "read_fps": round(self.read_fps, 1),
                 "detect_fps": round(self.detect_fps, 1), "size": self.size,
-                "people": len(self.detections)}
+                "people": len(self.detections), "error": self.error}
 
 
 def resolve_device(device) -> str:
@@ -243,7 +303,9 @@ def resolve_device(device) -> str:
     return "0" if torch.cuda.is_available() else "cpu"
 
 
-STREAM_KEYS = ("ip", "ip_env", "rtsp_port", "channel")
+# changing any of these restarts the camera's stream (pose edits apply live)
+STREAM_KEYS = ("type", "ip", "ip_env", "rtsp_port", "channel", "onvif_port", "profile", "url", "device",
+               "width", "height", "username_env", "password_env")
 
 
 def stream_key(cam: dict) -> tuple:
@@ -292,5 +354,6 @@ class CameraManager:
         for cam in self.store.section("cameras") or []:
             w = self.workers.get(cam["id"])
             out.append(w.status() if w else {"id": cam["id"], "connected": False, "enabled": False,
-                                             "read_fps": 0, "detect_fps": 0, "size": (0, 0), "people": 0})
+                                             "read_fps": 0, "detect_fps": 0, "size": (0, 0), "people": 0,
+                                             "error": ""})
         return out
