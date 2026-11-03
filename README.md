@@ -33,7 +33,7 @@ The system has three parts, and each has its own guide:
 
 | Part | What it is | Guide |
 |------|------------|-------|
-| **Tracker** (PC) | Python service with a web UI. Reads the cameras, runs YOLO person detection (GPU or CPU), places people on a yard map, picks a target for each eye and streams angles to the eyes. Runs in Docker or directly on Windows. Calibrated from your phone. | [docs/TRACKER.md](docs/TRACKER.md) |
+| **Tracker** (PC) | Python service with a web UI. Reads the cameras, runs YOLO person detection (GPU or CPU), places people on a yard map, picks a target for each eye and streams angles to the eyes. Runs in Docker or directly on Windows. Calibrated from your phone. Includes a 3D eye simulator. | [docs/TRACKER.md](docs/TRACKER.md) |
 | **Eye controller** (ESP32) | PlatformIO firmware for each eye. Drives four servos (pan, tilt, two eyelids) and a 7-LED ring, runs the behaviours on its own, and takes its settings and firmware updates over WiFi. | [docs/FIRMWARE.md](docs/FIRMWARE.md), [docs/WIRING.md](docs/WIRING.md) |
 | **Printed eye and mount** | A 102 mm glowing eyeball in a two-axis gimbal with moving lids, held in a lattice frame that hangs on the window from a suction cup. Generated from a Python CAD script. | [docs/PRINTED_PARTS.md](docs/PRINTED_PARTS.md) |
 
@@ -60,6 +60,16 @@ settings card for every eye and camera. There are also phone pages for calibrati
 cameras and the eyes' aim while you stand in the yard. Take the full tour in
 [docs/TRACKER.md](docs/TRACKER.md#the-web-ui).
 
+![Eye simulator: the 3D eye tracking a person placed on the demo yard map](docs/images/simulator.png)
+
+The UI also has an [eye simulator](docs/TRACKER.md#eye-simulator): the printed parts in 3D,
+running a copy of the firmware's behaviour code. It moves and lights the way the eye would:
+tracking, blinking, wandering, startling, then falling asleep. It can mirror what the
+tracker sends a real eye, or let you play the person by placing yourself on a yard map.
+Settings show in it as you edit them, before you save. You can turn the model, hide parts
+and cut it in half to see inside. It works with no eye, camera or printer, so you can try
+the project before building anything.
+
 ## What you need
 
 - **Per eye:** an ESP32 board (HiLetgo OLED kit or Adafruit HUZZAH32 Feather), a WS2812B
@@ -72,22 +82,25 @@ cameras and the eyes' aim while you stand in the yard. Take the full tour in
 
 ## Getting started
 
-1. **Print and assemble an eye.** See [Printed parts](docs/PRINTED_PARTS.md).
-2. **Wire it up.** See [Wiring](docs/WIRING.md).
-3. **Flash the ESP32** over USB once; after that, updates go over WiFi. See
+1. **Optional: try it first.** Run the tracker (step 5) and open **Eye simulator** to see
+   the eye and tune its behaviour before printing anything. See
+   [Tracker → eye simulator](docs/TRACKER.md#eye-simulator).
+2. **Print and assemble an eye.** See [Printed parts](docs/PRINTED_PARTS.md).
+3. **Wire it up.** See [Wiring](docs/WIRING.md).
+4. **Flash the ESP32** over USB once; after that, updates go over WiFi. See
    [Firmware](docs/FIRMWARE.md#build-and-flash).
-4. **Run the tracker** in Docker or on Windows, and point it at your cameras and eyes. See
+5. **Run the tracker** in Docker or on Windows, and point it at your cameras and eyes. See
    [Tracker](docs/TRACKER.md#configure).
-5. **Set up the servos** from the web UI. See [Tracker → servo mechanics](docs/TRACKER.md#servo-mechanics-once-per-build).
-6. **Calibrate from your phone:** first the cameras (a guided walk around the yard), then
+6. **Set up the servos** from the web UI. See [Tracker → servo mechanics](docs/TRACKER.md#servo-mechanics-once-per-build).
+7. **Calibrate from your phone:** first the cameras (a guided walk around the yard), then
    each eye's aim. See [Tracker → calibration](docs/TRACKER.md#calibration).
-7. **Hang it in the window.** See [Printed parts → window mount](docs/PRINTED_PARTS.md#window-mount).
+8. **Hang it in the window.** See [Printed parts → window mount](docs/PRINTED_PARTS.md#window-mount).
 
 ## Repository layout
 
 | Path | What |
 |------|------|
-| `tracker/` | Python tracker and web UI; `config.default.yaml` is the config template; `tests/` has the unit tests |
+| `tracker/` | Python tracker and web UI; `config.default.yaml` is the config template; `tests/` has the unit tests; `eyetracker/static/sim/` is the simulator's port of the firmware behaviour |
 | `tracker-data/` | Your live `config.yaml` and calibration data (git-ignored, created on first run) |
 | `firmware/` | PlatformIO project; one environment per eye (`eye1` = HiLetgo OLED kit, `eye2` = Adafruit HUZZAH32 Feather) |
 | `cad/` | `build.py` generates the printable parts into `cad/stl/`; `export_sim.py` exports the assembly for the simulator; `render.py` draws the pictures in these docs |
