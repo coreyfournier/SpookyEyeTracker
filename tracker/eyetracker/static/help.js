@@ -92,12 +92,14 @@ const FIELD_HELP = L => ({
   'eye:firmware.servos': `Mechanical setup of each servo. Set once per build using the sliders on the right: find the
     values, copy them in, Save & Push.`,
   'eye:firmware.servos.pan.center': 'Servo pulse (µs) that points the eye straight ahead, left/right.',
-  'eye:firmware.servos.pan.us_per_deg': `Pulse change per degree of eye movement. Make it negative if the eye moves the wrong
-    way (left when it should go right).`,
+  'eye:firmware.servos.pan.us_per_deg': `Pulse change per degree of eye movement. The yoke sits right on the pan servo, so
+    this is the servo's own (about 11 for an SG90). Make it negative if the eye moves the wrong way (left when it should
+    go right).`,
   'eye:firmware.servos.pan.min': 'Furthest the eye may turn to one side, in degrees (negative). Stops it hitting the shell.',
   'eye:firmware.servos.pan.max': 'Furthest the eye may turn to the other side, in degrees.',
   'eye:firmware.servos.tilt.center': 'Servo pulse (µs) that points the eye straight ahead, up/down.',
-  'eye:firmware.servos.tilt.us_per_deg': 'Pulse change per degree. Make it negative if up and down are reversed.',
+  'eye:firmware.servos.tilt.us_per_deg': `Pulse change per degree. The pushrod gears tilt about 2.4:1, so about 27 for an SG90 on
+    the horn's 8 mm hole. Make it negative if up and down are reversed.`,
   'eye:firmware.servos.tilt.min': 'Furthest the eye may look down, in degrees (negative).',
   'eye:firmware.servos.tilt.max': 'Furthest the eye may look up, in degrees.',
   'eye:firmware.servos.lid_upper': 'Servo pulses (µs) for the upper eyelid fully open and fully closed.',

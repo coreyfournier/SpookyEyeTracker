@@ -2,8 +2,8 @@
 
 Unlike stl/ (print orientation), every part here is in assembly coordinates - origin = eye
 centre, +Y = gaze, +Z = up - so the simulator can move them as the servos do:
-  pan   yoke + eye + LED insert turn about Z
-  tilt  eye + LED insert turn about X (on the yoke pins)
+  pan   yoke + eye + LED insert turn about Z (the pan servo inside the eye stays put)
+  tilt  eye + LED insert turn about X (on the yoke pins); the simulator draws the tilt rod
   lids  turn about X; as modelled they are closed, open = +-LID_OPEN
 Run from cad/:  python export_sim.py   (re-run after changing build.py)"""
 import json, os
@@ -25,4 +25,6 @@ for name, m in parts.items():
 # dimensions the simulator needs to colour the iris and swing the lids
 with open(f"{OUT}/model.json", "w") as f:
     json.dump({"r_eye": b.R_EYE, "iris_r": b.IRIS_R, "led_face": b.LED_FACE, "lid_open": b.LID_OPEN, "y_glass": b.Y_GLASS,
+               # tilt pushrod: servo shaft (y, z) behind the eye, horn hole radius, ball height on the pan axis
+               "tilt_shaft": list(b.TILT_SHAFT), "tilt_horn": b.TILT_HORN, "tilt_ball_z": b.TILT_BALL_Z,
                "parts": list(parts)}, f, indent=1)

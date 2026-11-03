@@ -12,8 +12,8 @@ const clampf = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
 // eye_config.h defaults
 export function defaultConfig() {
   return {
-    pan: {center: 1500, usPerDeg: 30, minDeg: -25, maxDeg: 25},
-    tilt: {center: 1500, usPerDeg: 30, minDeg: -15, maxDeg: 15},
+    pan: {center: 1500, usPerDeg: 11, minDeg: -25, maxDeg: 25},
+    tilt: {center: 1500, usPerDeg: 27, minDeg: -15, maxDeg: 15},
     lidUpper: {openUs: 1100, closedUs: 1700},
     lidLower: {openUs: 1900, closedUs: 1300},
     maxSpeed: 400, smoothing: 0.08, trackHold: 2,

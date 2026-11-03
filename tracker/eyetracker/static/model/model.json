@@ -4,6 +4,12 @@
  "led_face": 28.0,
  "lid_open": 45.0,
  "y_glass": 60.0,
+ "tilt_shaft": [
+  -75.0,
+  19.5
+ ],
+ "tilt_horn": 8.0,
+ "tilt_ball_z": 18.0,
  "parts": [
   "frame",
   "stalk",

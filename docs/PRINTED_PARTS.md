@@ -18,6 +18,7 @@ lattice frame (left). The frame on its own (right).</i></p>
 - [The parts](#the-parts)
 - [Shopping list](#shopping-list)
 - [How the eye lights up](#how-the-eye-lights-up)
+- [How the eye moves](#how-the-eye-moves)
 - [Printing](#printing)
 - [Window mount](#window-mount)
 - [Mounting the ESP32](#mounting-the-esp32)
@@ -30,13 +31,13 @@ lattice frame (left). The frame on its own (right).</i></p>
 
 | File | What it is |
 |------|------------|
-| `frame.stl` | Window plate, cup pocket, base tray, servo cradles, lid pivots, the stalk pedestal and the side rails the ESP32 mounts on, in one piece |
+| `frame.stl` | Window plate, cup pocket, base tray, cradles for the tilt and lid servos, lid pivots, the stalk pedestal and the side rails the ESP32 mounts on, in one piece |
 | `eye_front.stl` | Front of the eyeball: the glowing white and iris. Twist-locks onto the rear (bayonet with a click detent) |
-| `eye_rear.stl` | Back of the eyeball: the side pivot bosses and the tabs the pan and tilt pushrods pull on |
+| `eye_rear.stl` | Back of the eyeball: the side pivot bosses, the opening the stalk and tilt rod come in through, and the post inside that the tilt rod pulls on |
 | `led_insert.stl` | Funnel that carries the jewel's centre LED to the iris and keeps the ring LEDs' light on the white. Twist-locks into the front of the eye |
 | `lid_upper.stl`, `lid_lower.stl` | Eyelids, each with a lever arm for its servo pushrod |
-| `yoke.stl` | Gimbal cross-piece: the eye pivots on its ends (tilt), and it turns on the stalk (pan) |
-| `stalk.stl` | Arm from the frame's pedestal forward to the yoke |
+| `yoke.stl` | Gimbal cross-piece: the eye pivots on its ends (tilt), and it sits on the pan servo's horn (pan) |
+| `stalk.stl` | Arm from the frame's pedestal into the eye, with a cradle for the pan servo under the yoke |
 | `cup_shims.stl` | Spacers (1, 2 and 4 mm) for the suction cup pocket, if needed |
 | `*_nosupport.stl` | Versions of the eye halves without the built-in snap-off supports |
 | `ASSEMBLY_*.stl` | Everything in place, for checking (not for printing) |
@@ -53,11 +54,13 @@ approximate, so check against your prints. Electronics are listed in
 |----:|------|----------|
 | 1 | Large threaded suction cup, 8-32 stud with nut (e.g. UBL large threaded cup) | Hangs the frame on the window. Up to 2.68" / 68 mm across |
 | 2 | 3 mm dowel pin, ~15 mm | Eye pitch pivots (press-fit through the eye's side bosses into the yoke) |
-| 1 | 3 mm dowel pin or M3 bolt, ~20 mm | Pan pivot through the stalk and yoke hub |
+| 2 | Small screws from the servo's accessory bag (or M2 × 6 mm self-tapping) | Pan servo's double-arm horn to the yoke, through whichever pair of the yoke's holes line up |
+| 1 | M2 ball link pair: ball stud + snap-on socket (RC car / plane linkage, for 1.5–2 mm rod) | Tilt rod to the post inside the eye. Screw the stud up into the post's 1.6 mm hole |
 | 2 | M3 × 25-30 mm screws | Stalk (16 mm thick) to the frame pedestal (self-tapping into the printed holes) |
+| 4 | M2 × 6-8 mm screws (or the servo's own) | Pan servo ears to the stalk's cradle (self-tapping) |
 | 2 | M3 × 12 mm screws | Eyelid pivots: through each frame upright (self-tapping) into the lid's pivot hole |
 | 2 | M2 / #2 × 6 mm (1/4") coarse-thread self-tapping screws for plastic (ST2.2, pan head) | LED jewel to the LED insert (1.6 mm pilot holes) |
-| 4 | ~1.5 mm steel wire pushrods (or servo linkage kit) | Servo horns to the eye/lid tabs (2.2 mm holes). Z-bend the ends |
+| 3 | ~1.5 mm steel wire pushrods (or servo linkage kit) | Tilt servo horn to the ball link (~75 mm), and each lid servo horn to its lid's lever (2.2 mm holes, Z-bend the ends) |
 | 4 | M4 screws | Optional: screw the frame down to a shelf instead of hanging it |
 | 4 | M2 or M2.5 screws with 5–8 mm standoffs and nuts | ESP32 board to the side rails (drill the holes to suit your board) |
 
@@ -84,6 +87,38 @@ The firmware drives them separately: the iris shows the state colour (idle / tra
 sleep) and the white shows the `sclera` colour (see
 [Firmware → behaviours](FIRMWARE.md#behaviours)). Paint a pupil on the iris if you want one.
 
+## How the eye moves
+
+The eye sits in a gimbal: it **tilts** on two pins through its sides into the yoke, and
+the yoke **pans** about the vertical axis. Each axis is driven from a point the other axis
+doesn't move, so pan and tilt never fight each other:
+
+| Axis | Driven by | Why the other axis doesn't disturb it |
+|------|-----------|---------------------------------------|
+| Pan (±25°) | The pan servo, upright **inside** the eye on the stalk. The yoke sits straight on its horn | The yoke doesn't tilt, so tilting can't reach the pan servo. No pushrod |
+| Tilt (±15°) | The tilt servo behind the eye. One pushrod goes in through the rear opening to a ball stud under a post inside the top of the eye | The ball is on the pan axis, so panning only spins it on its stud. The rod's length to it never changes |
+
+The pan servo turns one-for-one with the eye (`us_per_deg` about 11). The tilt pushrod
+gears the tilt about 2.4:1 on the horn's 8 mm hole (about 36° of servo for ±15° of eye,
+`us_per_deg` about 27). `cad/build.py` checks every corner of the pan × tilt range for
+collisions, including the rod, and that the rod's length doesn't change with pan.
+
+**Assembling the gimbal:**
+1. Screw the pan servo into the stalk's cradle, shaft up. Screw a ball stud up into the
+   post inside `eye_rear`, leaving the ball about 4–5 mm below the post.
+2. Centre the pan servo (flash the firmware with the horn off: it goes to `center`), then
+   press its double-arm horn on so the arms run left-right. Fit the yoke over the horn, put
+   the horn's screw in through the yoke's centre hole, and fix the yoke to the horn with two
+   small screws through the pair of yoke holes that line up.
+3. Feed the stalk's back end out through the rear opening of `eye_rear` from the front, so
+   the servo and yoke sit inside. Press the two pins through the eye's side bosses into the
+   yoke ends.
+4. Bolt the stalk to the frame's pedestal. Reach in through the rear opening to snap the tilt
+   rod's ball link onto the ball. Z-bend the rod's other end into the tilt servo horn's 8 mm
+   hole, with the horn pointing up and the eye looking straight ahead.
+5. Twist-lock `eye_front` (with the LED insert) onto the rear. Route the servo and LED
+   wires out through the rear opening along the stalk.
+
 ## Printing
 
 **Eye parts.**
@@ -103,7 +138,8 @@ sleep) and the white shows the `sclera` colour (see
    bump, and stop against the end stops. The arm then points straight up and down, where the
    lids hide it.
 5. To take it out, twist it back clockwise and pull.
-- `eye_rear.stl` has snap-off blocks under its pivot bosses, and `yoke.stl` sits flat.
+- `eye_rear.stl` has snap-off blocks under its pivot bosses and under the tilt post. `yoke.stl`
+  sits flat (the horn pocket underneath bridges 6.6 mm), and `stalk.stl` prints on its side.
 
 **Frame.** To save filament and print time, every wall of the frame is a thin plate with
 diamond lattice cut-outs. The plates stay solid wherever another part joins them, and

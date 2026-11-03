@@ -255,7 +255,8 @@ Done on the **Eyes** tab, with the servo horns off at first. See also
 
 1. Use the µs sliders to find each servo's centre and the lid open/closed positions.
 2. Press the buttons to copy them into the form.
-3. Fit the horns and pushrods at those positions, then tune `us_per_deg`.
+3. Fit the horns and pushrods at those positions, then tune `us_per_deg`. Start from about
+   11 for pan (direct drive) and 27 for tilt (see [How the eye moves](PRINTED_PARTS.md#how-the-eye-moves)).
 4. **Save & Push**. This is stored on the eye.
 
 If a servo moves the wrong way (an arrow on the calibration page moves the eye the wrong

@@ -25,8 +25,10 @@ struct Rgb {
 struct EyeConfig {
   uint32_t ver = 0;
 
-  ServoAxis pan{1500, 30.0f, -25.0f, 25.0f};
-  ServoAxis tilt{1500, 30.0f, -15.0f, 15.0f};
+  // pan: the yoke sits on the servo horn, so 1 eye degree = 1 servo degree (SG90 ~11 us/deg);
+  // tilt: the pushrod gears it ~2.4:1 (horn hole 8 mm, ball 18 mm above the pivot)
+  ServoAxis pan{1500, 11.0f, -25.0f, 25.0f};
+  ServoAxis tilt{1500, 27.0f, -15.0f, 15.0f};
   LidServo lidUpper{1100, 1700};
   LidServo lidLower{1900, 1300};
 

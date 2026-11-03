@@ -90,8 +90,8 @@ eyes:
   # work even when the PC is offline). Set it once per build with the Eyes tab sliders.
   firmware:              # pushed to the eye over UDP and stored in its flash
     servos:
-      pan: {center: 1500, us_per_deg: 30.0, min: -25.0, max: 25.0}
-      tilt: {center: 1500, us_per_deg: 30.0, min: -15.0, max: 15.0}
+      pan: {center: 1500, us_per_deg: 11.0, min: -25.0, max: 25.0}    # direct drive: servo deg = eye deg
+      tilt: {center: 1500, us_per_deg: 27.0, min: -15.0, max: 15.0}   # pushrod gears it ~2.4:1
       lid_upper: {open: 1100, closed: 1700}
       lid_lower: {open: 1900, closed: 1300}
     motion: {max_speed: 400.0, smoothing: 0.08, track_hold: 2.0}
@@ -121,8 +121,8 @@ eyes:
   aim: {pan_offset: 0.0, pan_scale: 1.0, tilt_offset: 0.0, tilt_scale: 1.0}
   firmware:              # pushed to the eye over UDP and stored in its flash
     servos:
-      pan: {center: 1500, us_per_deg: 30.0, min: -25.0, max: 25.0}
-      tilt: {center: 1500, us_per_deg: 30.0, min: -15.0, max: 15.0}
+      pan: {center: 1500, us_per_deg: 11.0, min: -25.0, max: 25.0}    # direct drive: servo deg = eye deg
+      tilt: {center: 1500, us_per_deg: 27.0, min: -15.0, max: 15.0}   # pushrod gears it ~2.4:1
       lid_upper: {open: 1100, closed: 1700}
       lid_lower: {open: 1900, closed: 1300}
     motion: {max_speed: 400.0, smoothing: 0.08, track_hold: 2.0}

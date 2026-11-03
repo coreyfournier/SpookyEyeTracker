@@ -239,7 +239,36 @@ async function loadModel() {
   meshes.glow = new THREE.PointLight(0xff0000, 0, 260, 1.6);
   meshes.glow.position.set(0, model.r_eye + 6, 0);
   tilt.add(meshes.glow);
+  // the tilt pushrod: from the tilt servo's horn behind the eye, in through the rear opening,
+  // to a ball stud under the post inside the eye (on the pan axis, so panning only spins it)
+  const steel = mat(0xb8bcc2, {metalness: 0.6, roughness: 0.35});
+  meshes.rod = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1, 10), steel);
+  meshes.horn = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 1, 12), mat(0xf5f5f4));
+  meshes.ball = new THREE.Mesh(new THREE.SphereGeometry(2.4, 16, 12), steel);
+  root.add(meshes.rod, meshes.horn, meshes.ball);
   $('#loading').remove();
+}
+
+// Tilt linkage, as cad/build.py tilt_linkage(): the ball rides on the eye; the horn turns to
+// whatever angle keeps the rod at its length.
+const Y = new THREE.Vector3(0, 1, 0);
+function stretch(mesh, a, b) {   // a unit cylinder from a to b
+  const d = b.clone().sub(a);
+  mesh.position.copy(a).addScaledVector(d, 0.5);
+  mesh.scale.set(1, d.length(), 1);
+  mesh.quaternion.setFromUnitVectors(Y, d.normalize());
+}
+function tiltLinkage(tiltDeg) {
+  const [sy, sz] = model.tilt_shaft, h = model.tilt_horn, bz = model.tilt_ball_z, a = rad(tiltDeg);
+  const ball = new THREE.Vector3(0, -bz * Math.sin(a), bz * Math.cos(a));
+  const tip = phi => new THREE.Vector3(0, sy + h * Math.sin(rad(phi)), sz + h * Math.cos(rad(phi)));
+  const len = tip(0).distanceTo(new THREE.Vector3(0, 0, bz));
+  let lo = -80, hi = 80;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (tip(mid).distanceTo(ball) > len) lo = mid; else hi = mid;
+  }
+  return {ball, tip: tip(lo), shaft: new THREE.Vector3(0, sy, sz)};
 }
 
 // ---------------- the eye ----------------
@@ -451,7 +480,7 @@ function applyShow() {
   if (!meshes.frame) return;
   meshes.frame.visible = show.frame;
   meshes.stalk.visible = show.frame;
-  meshes.servos.visible = show.servos;
+  meshes.servos.visible = meshes.rod.visible = meshes.horn.visible = meshes.ball.visible = show.servos;
   lidU.visible = lidL.visible = show.lids;
   meshes.sclera.visible = meshes.iris.visible = show.front;
   renderer.clippingPlanes = show.cut ? [cut] : [];
@@ -509,6 +538,10 @@ function frame(t) {
     tilt.rotation.x = rad(p.tilt);                // +tilt = up
     lidU.rotation.x = rad(p.upper * model.lid_open);
     lidL.rotation.x = -rad(p.lower * model.lid_open);
+    const k = tiltLinkage(p.tilt);
+    stretch(meshes.rod, k.tip, k.ball);
+    stretch(meshes.horn, k.shaft, k.tip);
+    meshes.ball.position.copy(k.ball);
     paintLeds();
   }
   hud();

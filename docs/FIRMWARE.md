@@ -40,7 +40,7 @@ Per eye, unless noted.
 | 1 | [HiLetgo ESP32 OLED WiFi Kit](https://www.amazon.com/dp/B07DKD79Y9) | Classic ESP32 + 0.96" OLED. Firmware target `heltec_wifi_kit_32_v2` |
 | *or* | Adafruit HUZZAH32 ESP32 Feather | Classic ESP32, no display; status on the red LED. Firmware target `featheresp32` |
 | 1 | [WS2812B 7-LED RGB ring ("jewel")](https://www.amazon.com/dp/B0B2D6JDVJ) | One ring per eye; the pack has 7, enough for 7 eyes. Lights the iris and the white of the eye |
-| 4 | SG90 micro servo (9 g) | Pan, tilt, upper lid, lower lid. MG90S (metal gear) is a drop-in upgrade |
+| 4 | SG90 micro servo (9 g) | Pan, tilt, upper lid, lower lid. MG90S (metal gear) is a drop-in upgrade, and worth it for pan: that servo carries the eye on its shaft |
 | 1 | 5 V power supply, **3 A or more** | Powers the servos and LEDs. Four servos can stall at over 2 A, so don't use the ESP32's USB 5 V |
 | 1 | DC barrel jack / screw-terminal adapter | To match the supply's plug |
 | 1 | 1000 µF electrolytic capacitor, 10 V+ | Across 5 V/GND near the servos |

@@ -38,6 +38,24 @@ def wedge_x(a1, a2, x0, x1, r=120):
     T = [[0, 0, 1, x0], [1, 0, 0, 0], [0, 1, 0, 0]]        # u->Y, v->Z, w->X
     return ex.transform(T)
 
+# ---------------- DRIVE ----------------
+# Each axis is driven from a point the other axis doesn't move, so pan and tilt never fight:
+#  - pan: the pan servo sits INSIDE the eyeball on the stalk, its shaft on the pan axis (Z), and
+#    the yoke sits directly on its horn. No pushrod; tilting the eye can't reach it.
+#  - tilt: one pushrod from a servo behind the eye, in through the rear opening, to a ball stud
+#    on a post hanging from the inside top of the eye. The ball is ON the pan axis, so panning
+#    only spins it on its stud.
+# (Pushrods to two tabs on the eyeball, as before, coupled the axes: panning needed the tilt
+# rod up to 20mm longer, so it jammed.)
+PAN_EAR_Z = -14.8             # pan servo ear plane: puts the horn top 1.5mm up into the yoke
+OPEN_R = 40.0                 # rear opening: the stalk and tilt rod clear it by 2mm+ at any pan + tilt
+TILT_BALL_Z = 18.0            # tilt ball centre above the eye centre (M2 ball stud, up into the post)
+TILT_SHAFT = (-75.0, 19.5)    # tilt servo shaft (y, z); shaft along X, horn in the plane x = 0. Its
+                              # lower ear clears the stalk arm (top z 8) by 0.9mm
+TILT_FACE = 10.75             # tilt servo ears rest on this face (x), which puts its horn at x = 0
+TILT_HORN = 8.0               # horn hole the rod uses: the servo turns ~2.25x the eye's tilt
+STALK_SCREWS = (-105, -90)    # stalk-to-pedestal screws (y), clear of the tilt horn above
+
 # ---------------- EYE ----------------
 SEAM = 9.0                    # front cap / rear body split plane (y)
 def boss(sign):
@@ -55,6 +73,8 @@ def rear_boss_supports():
     for sign in (1, -1):
         x0, x1 = (40.3, 47.0) if sign > 0 else (-47.0, -40.3)
         s += box(x0, x1, SEAM - 3.6 + PRINT_GAP, SEAM, -4.2, 4.2)
+    # the tilt post's front face is 5.5mm above the bed: a block under it, inside the socket bore
+    s += box(-4.5, 4.5, 3.5 + PRINT_GAP, SEAM, TILT_BALL_Z + 4.5, 46.8)
     return s
 
 def eye_full():
@@ -69,13 +89,15 @@ def eye_full():
     # too left the iris rim starting in mid-air and printing stringy.
     e -= (sphere(R_EYE + 1) - sphere(R_EYE - IRIS_RECESS)) ^ cyl_y(IRIS_R, 0, 60)
     # LED hardware now lives on the separate led_insert() part
-    # rear opening for the support stalk
-    e -= cyl_y(30, -60, -20)
-    # yaw (pan) tab: plate in XY plane, hole along Z
-    yt = (box(32, 40, -50, -30, -2.5, 2.5) - sphere(R_EYE - T_EYE)) - cyl_z(ROD, -5, 5, x=36, y=-45)
-    # pitch (tilt) tab: plate in YZ plane, hole along X
-    pt = (box(-34.5, -29.5, -50, -30, 16, 24) - sphere(R_EYE - T_EYE)) - cyl_x(ROD, -40, -25, y=-46, z=20)
-    e += yt + pt
+    # rear opening: the stalk (with the pan servo) and the tilt rod come in here
+    e -= cyl_y(OPEN_R, -60, -20)
+    # tilt post: hangs from the inside top down to the ball stud on the pan axis. It stays
+    # behind the bayonet socket (y < LIP_Y0), so it's part of the rear half.
+    # The bottom tapers to a round nose so that, tilted, its corners swing clear of the rod.
+    post = box(-4.5, 4.5, -6, 3.5, TILT_BALL_Z + 9.5, R_EYE) + M.batch_hull(
+        [box(-4.5, 4.5, -6, 3.5, TILT_BALL_Z + 9.5, TILT_BALL_Z + 9.6), cyl_z(3.5, TILT_BALL_Z + 4.5, TILT_BALL_Z + 4.6)])
+    post ^= sphere(R_EYE - 0.3)
+    e += post - cyl_z(0.8, TILT_BALL_Z, TILT_BALL_Z + 11)        # M2 tap for the ball stud
     return e
 
 def wedge_y(a1, a2, y0, y1, r=60):
@@ -193,20 +215,31 @@ def insert_shelves():
 
 # ---------------- YOKE (inside eye) ----------------
 def yoke():
-    # arms are as tall as the hub (+-4.8) so the part prints flat; with +-4 arms they hung
-    # 0.8mm above the bed. The hub already keeps this 0.2mm clearance to the stalk plates.
+    # arms are as tall as the hub (+-4.8) so the part prints flat. It sits on the pan servo's
+    # double-arm horn: a 1.5mm pocket underneath along the arms locates it, the horn's own screw
+    # goes in through the centre hole, and two small screws through the horn hold it.
     y = box(-39.6, 39.6, -4, 4, -4.8, 4.8) + cyl_z(7, -4.8, 4.8)
-    y -= cyl_z(PIN, -10, 10)
+    y -= box(-17, 17, -3.3, 3.3, -5, -3.3) + cyl_z(4.0, -5, -3.3)   # horn pocket
+    y -= cyl_z(2.6, -10, 10)                                         # horn screw + screwdriver
+    for x in (-14, -10, 10, 14):                                     # horn screws: use the pair that lines up
+        y -= cyl_z(0.75, -10, 10, x=x)
     y -= cyl_x(PIN, 26, 41) + cyl_x(PIN, -41, -26)
     return y
 
 # ---------------- STALK (bolts to frame pedestal) ----------------
 def stalk():
-    plate = cyl_z(7.5, 0, 3) + box(-7.5, 7.5, -40, 0, 0, 3)
-    s = plate.translate([0, 0, 5]) + plate.translate([0, 0, -8])
-    s += box(-7.5, 7.5, -110, -38, -8, 8)
-    s -= cyl_z(PIN, -10, 10)
-    for yy in (-100, -75):
+    """Arm from the pedestal in through the eye's rear opening, carrying the pan servo upright
+    under the yoke (shaft on the pan axis). Everything inside the eye stays within r < 48.5, so
+    the shell turns around it; only the arm crosses the opening."""
+    cy = -(SV_L / 2 - 5.9)                                          # servo body centre (shaft at y=0)
+    s = box(-10, 10, -110, -22.5, -8, 8)                            # arm (bolts to the pedestal)
+    s += box(-10, 10, -30, -22.5, PAN_EAR_Z - 4, 8)                 # web down to the cradle
+    cradle = box(-10, 10, -24, 12, PAN_EAR_Z - 4, PAN_EAR_Z)        # plate under the servo ears
+    cradle -= box(-SV_W / 2 - 0.3, SV_W / 2 + 0.3, cy - SV_L / 2 - 0.3, cy + SV_L / 2 + 0.3, -40, 0)
+    for d in (-EAR, EAR):
+        cradle -= cyl_z(0.9, -40, 0, y=cy + d)
+    s += cradle
+    for yy in STALK_SCREWS:
         s -= cyl_z(PIN, -10, 10, y=yy)
     return s
 
@@ -237,21 +270,17 @@ def lid(upper=True):
 # ---------------- SERVO CRADLES / FRAME ----------------
 SV_L, SV_W, EAR = 22.8, 12.4, 13.9   # SG90 body + ear hole offset
 
-def cradle_plate_z(cx, cy, z_top, x0, x1, y0, y1):
-    """Horizontal plate, servo shaft +Z, body long axis along Y."""
-    p = box(x0, x1, y0, y1, z_top - 4, z_top)
-    p -= box(cx - SV_W / 2, cx + SV_W / 2, cy - SV_L / 2 - 0.3, cy + SV_L / 2 + 0.3, z_top - 10, z_top + 1)
-    for d in (-EAR, EAR):
-        p -= cyl_z(0.9, z_top - 10, z_top + 1, x=cx, y=cy + d)
-    return p
-
-def cradle_plate_x(face, thk_dir, cy, cz, y0, y1, z0, z1):
-    """Vertical plate normal to X. face = x where servo ears rest; thk_dir=+1 plate extends +x."""
+def cradle_plate_x(face, thk_dir, cy, cz, y0, y1, z0, z1, upright=False):
+    """Vertical plate normal to X. face = x where servo ears rest; thk_dir=+1 plate extends +x.
+    (cy, cz) = servo body centre; its long axis runs along Y, or along Z if upright."""
     xa, xb = (face, face + 4) if thk_dir > 0 else (face - 4, face)
     p = box(xa, xb, y0, y1, z0, z1)
-    p -= box(xa - 1, xb + 1, cy - SV_L / 2 - 0.3, cy + SV_L / 2 + 0.3, cz - SV_W / 2, cz + SV_W / 2)
+    if upright:
+        p -= box(xa - 1, xb + 1, cy - SV_W / 2 - 0.3, cy + SV_W / 2 + 0.3, cz - SV_L / 2 - 0.3, cz + SV_L / 2 + 0.3)
+    else:
+        p -= box(xa - 1, xb + 1, cy - SV_L / 2 - 0.3, cy + SV_L / 2 + 0.3, cz - SV_W / 2, cz + SV_W / 2)
     for d in (-EAR, EAR):
-        p -= cyl_x(0.9, xa - 1, xb + 1, y=cy + d, z=cz)
+        p -= cyl_x(0.9, xa - 1, xb + 1, y=cy + (0 if upright else d), z=cz + (d if upright else 0))
     return p
 
 # ---------------- WINDOW MOUNT ----------------
@@ -385,14 +414,13 @@ def frame():
     # stalk pedestal: a channel (top plate + two side walls) with bosses for the stalk screws
     f += box(-7.5, 7.5, -123, -56, -14, -8)
     f += box(-7.5, -4.5, -123, -56, zb, -8) + box(4.5, 7.5, -123, -56, zb, -8)
-    for yy in (-100, -75):
+    for yy in STALK_SCREWS:
         f += cyl_z(4.5, zb, -8, y=yy) ^ box(-7.5, 7.5, -130, 0, zb - 1, 0)
         f -= cyl_z(TAP, -30, -7, y=yy)
-    # pan servo (shaft +Z at x=36,y=-85, horn plane z=0)
-    f += cradle_plate_z(36, -90.5, -11, 23, 49, -123, -71)
-    f += box(23, 27, -123, -71, zb, -15) + box(45, 49, -123, -71, zb, -15)
-    # tilt servo (shaft -X, horn plane x=-32 at y=-85,z=20); ears rest on face x=-21
-    f += cradle_plate_x(-21, +1, -90.5, 20, -123, -66, zb, 32)
+    # (the pan servo rides on the stalk, inside the eye)
+    # tilt servo: upright beside the stalk, shaft along -X, horn in the plane x=0
+    ty, tz = TILT_SHAFT
+    f += cradle_plate_x(TILT_FACE, +1, ty, tz + SV_L / 2 - 5.9, -123, -62, zb, 40, upright=True)
     # upper-lid servo (horn plane x=54.5, y=-80, z=0); ears on face x=65.5
     f += cradle_plate_x(65.5, +1, -85.5, 0, -123, -66, zb, 12)
     # lower-lid servo (horn plane x=-58); ears on face x=-69
@@ -463,8 +491,7 @@ def lighten(f, extra=M()):
 
 # (x0, x1, y0, y1, top z) of each wall in the YZ plane that gets a lattice
 YZ_WALLS = [(60.5, 65.5, -41, Y_GLASS - PLATE_T, 41), (-65.5, -60.5, -41, Y_GLASS - PLATE_T, 41),  # gusset + upright
-            (23, 27, -123, -71, -15), (45, 49, -123, -71, -15),                             # pan cradle
-            (-21, -17, -123, -66, 32),                                                      # tilt cradle
+            (TILT_FACE, TILT_FACE + 4, -123, -62, 40),                                      # tilt cradle
             (65.5, 69.5, -123, -66, 12), (-73, -69, -123, -66, 12),                         # lid cradles
             (4.5, 7.5, -123, -56, -14), (-7.5, -4.5, -123, -56, -14)]                       # pedestal walls
 
@@ -480,22 +507,48 @@ def lighten_yz(f, x0, x1, y0, y1, z0, z1):
     return f - yz_slab(holes, x0 - 0.01, x1 + 0.01) if not holes.is_empty() else f
 
 # ---------------- dummy servos for preview ----------------
-def sg90():
+def sg90(horn=True, horn_rot=0):
     s = box(-SV_W / 2, SV_W / 2, -SV_L / 2, SV_L / 2, -15.9, 6.8)        # body (ears at z=0..2.5)
     s += box(-SV_W / 2, SV_W / 2, -16.1, 16.1, 0, 2.5)
     s += cyl_z(2.4, 6.8, 11, y=SV_L / 2 - 5.9)                          # shaft
-    s += box(-3, 3, SV_L / 2 - 5.9 - 16, SV_L / 2 - 5.9 + 3, 10, 11.5)  # horn
+    if horn:                                                            # horn, turned horn_rot about the shaft
+        s += box(-3, 3, -16, 3, 10, 11.5).rotate([0, 0, horn_rot]).translate([0, SV_L / 2 - 5.9, 0])
     return s  # shaft at y=+5.5, horn top ~11 above ears
 
-def servos():
-    s = M()
-    # pan: ears rest z=-11, shaft at y=-85
-    s += sg90().rotate([0, 0, 180]).translate([36, -90.5, -11]).rotate([0, 0, 0])
-    # tilt: shaft along -X; map servo +Z -> -X
-    s += sg90().rotate([0, 0, 180]).rotate([0, -90, 0]).translate([-21, -90.5, 20])
-    s += sg90().rotate([0, 0, 180]).rotate([0, -90, 0]).translate([65.5, -85.5, 0])
-    s += sg90().rotate([0, 0, 180]).rotate([0, 90, 0]).translate([-69, -85.5, 0])
+def pan_servo(horn=True):
+    """Upright inside the eye, on the stalk: shaft on the pan axis, horn along the yoke (X)."""
+    return sg90(horn, 90).translate([0, -(SV_L / 2 - 5.9), PAN_EAR_Z])
+
+def tilt_servo(horn=True):
+    """Upright behind the eye, body above the shaft, shaft along -X, horn pointing up in x=0."""
+    ty, tz = TILT_SHAFT
+    # servo x -> +y, servo y -> -z (body above the shaft), servo z (shaft) -> -x
+    m = np.array([[0, 0, -1, TILT_FACE], [1, 0, 0, ty], [0, -1, 0, tz + SV_L / 2 - 5.9]], float)
+    return sg90(horn).transform(m)
+
+def servos(horn=True):
+    s = pan_servo(horn) + tilt_servo(horn)
+    s += sg90(horn).rotate([0, 0, 180]).rotate([0, -90, 0]).translate([65.5, -85.5, 0])
+    s += sg90(horn).rotate([0, 0, 180]).rotate([0, 90, 0]).translate([-69, -85.5, 0])
     return s
+
+def tilt_linkage(tilt):
+    """Tilt pushrod for an eye tilt (deg, + = up): (ball centre, horn tip, servo angle in deg).
+    The servo angle is whatever keeps the rod at its length with the eye centred. Panning
+    doesn't enter into it: the ball is on the pan axis."""
+    ty, tz = TILT_SHAFT
+    a = np.radians(tilt)
+    ball = np.array([0.0, -TILT_BALL_Z * np.sin(a), TILT_BALL_Z * np.cos(a)])
+    tip = lambda phi: np.array([0.0, ty + TILT_HORN * np.sin(np.radians(phi)), tz + TILT_HORN * np.cos(np.radians(phi))])
+    length = np.linalg.norm(tip(0) - np.array([0, 0, TILT_BALL_Z]))
+    lo, hi = -80.0, 80.0                         # |tip - ball| falls as the horn turns forward
+    for _ in range(50):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if np.linalg.norm(tip(mid) - ball) > length else (lo, mid)
+    return ball, tip(lo), lo
+
+def rod(p0, p1, r=0.8):
+    return M.batch_hull([M.sphere(r, 12).translate(list(p0)), M.sphere(r, 12).translate(list(p1))])
 
 def save(m, name):
     mesh = m.to_mesh()
@@ -534,14 +587,37 @@ if __name__ == "__main__":
     for nm, a, b in [("eye-frame", eye, fr), ("eye-lidU_open", eye, lu_open), ("eye-lidL_open", eye, ll_open),
                      ("eye-lidU_closed", eye, lu), ("lidU-lidL_closed", lu, ll), ("lidU-lidL_open", lu_open, ll_open),
                      ("lids-frame", lu_open + ll_open, fr), ("lidsC-frame", lu + ll, fr), ("eye-stalk", eye, st),
-                     ("yoke-stalk", yk, st), ("servos-frame", servos(), fr), ("insert-eye", li, eye)]:
+                     ("yoke-stalk", yk, st), ("servos-frame", servos(False), fr), ("servos-stalk", servos(False), st),
+                     ("yoke-servos", yk, servos(False)), ("insert-eye", li, eye)]:
         print(nm, "overlap vol %.1f" % (a ^ b).volume())
     # insert twist-lock: at the unlocked angle it must slide all the way in past the shelves
     li_free = li.rotate([0, LOCK_TWIST, 0])
     print("insert entry path overlap %.1f" % max((li_free.translate([0, -d, 0]) ^ front).volume()
                                                  for d in (0, 0.5, 1, 2, 4, 8, 16)))
-    # eye rotated range check
-    for ang in [(20, 0, 0), (-20, 0, 0), (0, 0, 20), (0, 0, -20), (15, 0, 15)]:
-        er = eye.rotate(list(ang))
-        print("eye", ang, "stalk %.1f" % (er ^ st).volume(), "lidsOpen %.1f" % (er ^ (lu_open + ll_open)).volume(),
-              "frame %.1f" % (er ^ fr).volume())
+    # full range: every corner of pan x tilt. The eye (with its insert) tilts on the yoke and
+    # pans with it; the stalk, pan servo, frame, lids and tilt servo stay put.
+    fixed_servos = servos(False)
+    worst = 0.0
+    for pan in (-25, 0, 25):
+        for tilt in (-15, 0, 15):
+            er = (eye + li).rotate([tilt, 0, 0]).rotate([0, 0, pan])
+            yr = yk.rotate([0, 0, pan])
+            ball, tip, phi = tilt_linkage(tilt)
+            socket = M.sphere(3.5, 24).translate(list(ball))                  # the ball link's socket
+            link = rod(ball, tip) + socket
+            hits = {"stalk": er ^ st, "frame": er ^ fr, "lidsOpen": er ^ (lu_open + ll_open),
+                    "servos": er ^ fixed_servos, "yoke": er ^ yr, "yoke-stalk": yr ^ st,
+                    "rod-eye": (rod(ball + (tip - ball) * 6 / np.linalg.norm(tip - ball), tip) ^ er),
+                    "link-eye": socket ^ er,
+                    "rod-stalk": link ^ st, "rod-frame": link ^ fr}
+            vols = {k: v.volume() for k, v in hits.items()}
+            worst = max(worst, *vols.values())
+            print("pan %+3d tilt %+3d  servo %+5.1f deg  " % (pan, tilt, phi) +
+                  " ".join("%s %.1f" % kv for kv in vols.items()))
+    print("range check worst overlap %.2f" % worst)
+    # decoupling: the tilt rod's length to the ball doesn't change as the eye pans
+    _, tip0, _ = tilt_linkage(0)
+    ball0 = np.array([0, 0, TILT_BALL_Z])
+    print("tilt rod length change over pan +-25: %.3f mm" % max(
+        abs(np.linalg.norm(tip0 - np.array([[np.cos(a), -np.sin(a), 0], [np.sin(a), np.cos(a), 0], [0, 0, 1]]) @ ball0)
+            - np.linalg.norm(tip0 - ball0)) for a in np.radians([-25, 25])))
