@@ -1,0 +1,18 @@
+{
+ "r_eye": 51.0,
+ "iris_r": 20.0,
+ "led_face": 28.0,
+ "lid_open": 45.0,
+ "y_glass": 60.0,
+ "parts": [
+  "frame",
+  "stalk",
+  "yoke",
+  "eye_front",
+  "eye_rear",
+  "led_insert",
+  "lid_upper",
+  "lid_lower",
+  "servos"
+ ]
+}

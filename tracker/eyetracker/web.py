@@ -56,6 +56,10 @@ def create_app(store, world, link, director, cameras, calib, camcal=None) -> Fas
     def camcal_page():
         return FileResponse(STATIC / "camcal.html")
 
+    @app.get("/sim")
+    def sim_page():
+        return FileResponse(STATIC / "sim.html")
+
     @app.get("/api/config")
     def get_config():
         return store.get()
@@ -83,6 +87,12 @@ def create_app(store, world, link, director, cameras, calib, camcal=None) -> Fas
         }
 
     # ---------- eyes ----------
+    @app.get("/api/eyes/{eye_id}/sent")
+    def sent(eye_id: str):
+        """What the tracker last told this eye to do - the simulator replays it."""
+        eye_or_404(eye_id)
+        return link.sent(eye_id)
+
     @app.post("/api/eyes/{eye_id}/save_push")
     async def save_push(eye_id: str, eye: dict = Body(...)):
         if eye.get("id") != eye_id:

@@ -47,6 +47,7 @@
   details.sec > summary:hover { background: var(--bg); }
   details.sec[open] > summary { border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; }
   details.sec > .body { padding: 4px 10px 10px; }
+  .simframe { width: 100%; height: 360px; border: 0; border-radius: 6px; background: #0b0a0a; display: block; }
   details.sec .peek { margin-left: auto; display: flex; gap: 4px; align-items: center; color: var(--muted);
     font-weight: 400; font-size: 12px; }
   .peek .sw { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line); }
@@ -92,6 +93,7 @@
   </nav>
   <a href="/camcal" style="color:var(--accent)">Calibrate cameras ↗</a>
   <a href="/calibrate" style="color:var(--accent)">Calibrate by pointing ↗</a>
+  <a href="/sim" style="color:var(--accent)">Eye simulator ↗</a>
   <span id="units"></span>
   <div id="chips"></div>
 </header>
@@ -318,7 +320,7 @@ const GROUPS = {
 const SECTION_TITLES = {
   general: 'General', connection: 'Connection', placement: 'Position & direction', aim: 'Aim correction',
   servos: 'Servos', motion: 'Motion', blink: 'Blinking', wander: 'Wandering (idle glances)', iris: 'Colours & brightness',
-  spooky: 'Spooky mode', sleep: 'Sleep', lids: 'Eyelids', manual: 'Servo setup (manual control)',
+  spooky: 'Spooky mode', sleep: 'Sleep', lids: 'Eyelids', manual: 'Servo setup (manual control)', sim: 'Simulator',
   world: 'Yard', tracking: 'Tracking people', director: 'Choosing who to look at', detection: 'Person detection',
 };
 
@@ -428,6 +430,26 @@ function eyeCard(eye) {
     <div data-sliders></div>
     <div class="row"><button class="btn" data-center>Centre</button><button class="btn" data-release>Release to tracking</button></div>`;
   $('[data-manual]', card).appendChild(manual);
+  // 3D simulator of this eye (sim.html), loaded when first opened. It shows the form's unsaved edits.
+  const simSec = section('sim', eye.id, 'eye', '', eye.id + '-manual');
+  $('.body', simSec).innerHTML = `<div class="hint">What this eye does with the settings on the left, saved or not, and with
+    whatever the tracker sends it. <a href="/sim?eye=${eye.id}" target="_blank">Open full size ↗</a> for a demo where you play the person.</div>`;
+  let simFrame = null;
+  const sendToSim = () => {
+    if (!simFrame?.contentWindow) return;
+    try { simFrame.contentWindow.postMessage({type: 'eyesim:firmware', firmware: readForm(form, eye).firmware}, location.origin); }
+    catch { /* a half-typed field: send once it reads */ }
+  };
+  const openSim = () => {
+    if (!simSec.open || simFrame) return;
+    simFrame = Object.assign(document.createElement('iframe'), {src: `/sim?eye=${eye.id}&embed=1`, className: 'simframe',
+      title: `Simulator for ${eye.name || eye.id}`});
+    simFrame.onload = sendToSim;
+    $('.body', simSec).appendChild(simFrame);
+  };
+  simSec.addEventListener('toggle', openSim);
+  $('[data-manual]', card).appendChild(simSec);
+  setTimeout(openSim);   // reopened from the URL
   const msg = $('[data-msg]', card);
   let dirty = false;
   // Colours & brightness save and push as you change them, so the eye shows them live. Only that
@@ -444,6 +466,7 @@ function eyeCard(eye) {
   }), 300);
   if (colours) $('.body', colours).insertAdjacentHTML('afterbegin',
     '<div class="hint">Changes here are saved and sent to the eye straight away.</div>');
+  form.addEventListener('input', () => sendToSim());
   form.addEventListener('input', e => {
     if (!colours?.contains(e.target)) { dirty = true; msg.textContent = 'Unsaved changes'; }
     else if (e.target.type !== 'number') saveColours();   // colour pickers: live while dragging

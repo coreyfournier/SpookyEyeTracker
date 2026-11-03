@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eye Simulator</title>
+<style>
+  :root {
+    --bg: #f5f5f4; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --line: #e7e5e4;
+    --accent: #c2410c; --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --map: #fafaf9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0a09; --panel: #1c1917; --text: #f5f5f4; --muted: #a8a29e; --line: #292524;
+      --accent: #fb923c; --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --map: #141210;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif;
+         display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line);
+           background: var(--panel); flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; }
+  header a { color: var(--accent); }
+  #layout { flex: 1; display: flex; min-height: 0; }
+  #view { flex: 1; position: relative; min-width: 0; background: #0b0a0a; }
+  #view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #hud { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 4px;
+         color: #f5f5f4; font-size: 12px; pointer-events: none; text-shadow: 0 1px 2px #000; }
+  #hud .act { font-size: 15px; font-weight: 600; }
+  #hud .sw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #fff6;
+             vertical-align: -2px; margin: 0 3px 0 6px; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; color: #a8a29e; }
+  aside { width: 340px; flex: none; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line);
+          padding: 12px 14px; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 10px; padding: 6px 10px 10px; }
+  legend { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; }
+  label { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .hint { color: var(--muted); font-size: 12px; margin: 4px 0; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+  .btn { font: inherit; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg);
+         color: var(--text); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  select, input[type=range] { font: inherit; }
+  select { padding: 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  input[type=range] { flex: 1; min-width: 0; }
+  .slider { display: grid; grid-template-columns: 74px 1fr 44px; gap: 6px; align-items: center; margin: 2px 0; }
+  .slider output { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  #pad { width: 100%; height: 230px; border-radius: 6px; background: var(--map); border: 1px solid var(--line);
+         cursor: crosshair; display: block; touch-action: none; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+  #status { font-size: 12px; color: var(--muted); }
+  @media (max-width: 760px) {
+    #layout { flex-direction: column; }
+    #view { flex: none; height: 55vh; }
+    aside { width: auto; border-left: 0; border-top: 1px solid var(--line); }
+  }
+  body.embed header, body.embed aside { display: none; }
+  body.embed #view { flex: 1; height: auto; }
+</style>
+<script type="importmap">
+  {"imports": {"three": "/static/vendor/three/three.module.min.js"}}
+</script>
+</head>
+<body>
+<header>
+  <h1>Eye simulator</h1>
+  <select id="eye" title="Which eye's settings to simulate"></select>
+  <span id="status"></span>
+  <a href="/#eyes" style="margin-left:auto">← Eyes</a>
+</header>
+<div id="layout">
+  <div id="view">
+    <div id="loading">Loading the model…</div>
+    <div id="hud"><div class="act" id="act"></div><div id="pose"></div><div id="ledinfo"></div><div id="why"></div></div>
+  </div>
+  <aside>
+    <fieldset>
+      <legend>What drives it</legend>
+      <label><input type="radio" name="drive" value="mirror" checked> Mirror the tracker</label>
+      <div class="hint" data-for="mirror">Replays what the tracker sends this eye — the people it tracks, the manual
+        sliders, Identify — so you can watch the eye even when it's unplugged. <span id="lastcmd"></span></div>
+      <label><input type="radio" name="drive" value="demo"> Demo: you play the person</label>
+    </fieldset>
+
+    <fieldset data-for="demo" hidden>
+      <legend>Demo</legend>
+      <div class="hint">Click or drag in the yard to stand there; the eye is at the bottom, looking up the page.
+        Drag the eyeball in the 3D view to aim it by hand.</div>
+      <canvas id="pad"></canvas>
+      <div class="row">
+        <button class="btn primary" id="walk">Walk past</button>
+        <button class="btn" id="nobody">Nobody here</button>
+        <button class="btn" id="release" hidden>Release hand aim</button>
+      </div>
+      <div class="slider"><span>Eye height</span><input type="range" id="height" min="0.9" max="2.1" step="0.01" value="1.6"><output id="heightOut"></output></div>
+      <div class="slider"><span>Speed</span><input type="range" id="speed" min="0" max="3" step="1" value="0"><output id="speedOut">1×</output></div>
+      <div class="hint">Speed fast-forwards the eye's clock, e.g. to reach sleep sooner.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Try settings</legend>
+      <div class="hint">Starts from the eye's saved settings. These switches only change the simulator —
+        set them for real on the <a href="/#eyes" id="eyesLink">Eyes tab</a>.</div>
+      <div class="two" id="tries"></div>
+      <div class="row"><button class="btn" id="resetTries">Back to saved</button></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>View</legend>
+      <div class="two" id="shows"></div>
+      <div class="row">
+        <button class="btn" data-cam="front">Front</button><button class="btn" data-cam="side">Side</button>
+        <button class="btn" data-cam="top">Top</button><button class="btn" data-cam="back">Back</button>
+        <button class="btn" data-cam="angle">¾</button>
+      </div>
+      <div class="hint">Drag to turn the model, scroll or pinch to zoom, right-drag to slide it.</div>
+    </fieldset>
+  </aside>
+</div>
+<script src="/static/units.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import {STLLoader} from '/static/vendor/three/STLLoader.js';
+import {OrbitControls} from '/static/vendor/three/OrbitControls.js';
+import {toCreasedNormals} from '/static/vendor/three/BufferGeometryUtils.js';
+import {EyeBehavior, configFromJson} from '/static/sim/behavior.js';
+
+const $ = (s, el = document) => el.querySelector(s);
+const params = new URLSearchParams(location.search);
+const embed = params.has('embed');
+document.body.classList.toggle('embed', embed);
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+const api = async (path, body) => {
+  const r = await fetch(path, body === undefined ? {} : {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)});
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+};
+
+// ---------------- scene ----------------
+const view = $('#view');
+const renderer = new THREE.WebGLRenderer({antialias: true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+view.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 5, 5000);
+camera.up.set(0, 0, 1);                       // the CAD is Z-up, +Y = where the eye looks
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+const hemi = new THREE.HemisphereLight(0xffffff, 0x302820, 1);
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(300, 500, 600);
+scene.add(hemi, sun);
+
+const CAMS = {front: [0, 520, 30], side: [520, 0, 30], top: [0, -20, 560], back: [-60, -560, 120], angle: [300, 380, 170]};
+function setCam(name) {
+  camera.position.set(...CAMS[name]);
+  controls.target.set(0, -25, 5);
+  controls.update();
+}
+
+const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({color, roughness: 0.75, metalness: 0,
+  side: THREE.DoubleSide, ...extra});
+const MATS = {
+  frame: mat(0x4b4f55), stalk: mat(0x3a3d42), yoke: mat(0x3a3d42), servos: mat(0x2563eb, {roughness: 0.5}),
+  eye_rear: mat(0x26221f), led_insert: mat(0x111111), lid_upper: mat(0x8a6f5a), lid_lower: mat(0x8a6f5a),
+  sclera: mat(0xe8e4dc, {roughness: 0.6}), iris: mat(0xe8e4dc, {roughness: 0.5}),
+};
+
+// pivots: pan turns the yoke and everything on it about Z; tilt turns the eye about X on the yoke;
+// each lid swings about X. Parts are exported in these coordinates by cad/export_sim.py.
+const pan = new THREE.Group(), tilt = new THREE.Group(), lidU = new THREE.Group(), lidL = new THREE.Group();
+const root = new THREE.Group();
+root.add(pan, lidU, lidL);
+pan.add(tilt);
+scene.add(root);
+const meshes = {};
+let model;
+
+function splitIris(geom, irisR, rEye) {
+  // the iris is the round window at the front (lit by the centre LED); the rest is the white
+  const pos = geom.attributes.position, iris = [], white = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i += 3) {
+    a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
+    const m = a.clone().add(b).add(c).divideScalar(3);
+    const inIris = m.y > 0 && Math.hypot(m.x, m.z) < irisR + 0.6 && m.length() > rEye - 1.0;
+    (inIris ? iris : white).push(i);
+  }
+  const pick = idx => {
+    const g = new THREE.BufferGeometry(), arr = new Float32Array(idx.length * 9);
+    idx.forEach((v, k) => { for (let j = 0; j < 9; j++) arr[k * 9 + j] = pos.array[v * 3 + j]; });
+    g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    return toCreasedNormals(g, rad(35));
+  };
+  return {iris: pick(iris), white: pick(white)};
+}
+
+async function loadModel() {
+  model = await (await fetch('/static/model/model.json')).json();
+  const loader = new STLLoader();
+  const geoms = await Promise.all(model.parts.map(p => loader.loadAsync(`/static/model/${p}.stl`)));
+  const add = (parent, name, geom, m = MATS[name]) => {
+    const mesh = new THREE.Mesh(geom, m);
+    mesh.name = name;
+    parent.add(mesh);
+    return mesh;
+  };
+  model.parts.forEach((name, i) => {
+    const g = geoms[i];
+    if (name === 'eye_front') {
+      const {iris, white} = splitIris(g, model.iris_r, model.r_eye);
+      meshes.sclera = add(tilt, 'sclera', white);
+      meshes.iris = add(tilt, 'iris', iris);
+      return;
+    }
+    const smooth = toCreasedNormals(g, rad(35));
+    const parent = {yoke: pan, eye_rear: tilt, led_insert: tilt, lid_upper: lidU, lid_lower: lidL}[name] || root;
+    meshes[name] = add(parent, name, smooth);
+  });
+  // the Jewel: seven LEDs on the insert's back plane, visible with the front hidden or cut away
+  const jewel = new THREE.Group();
+  jewel.position.y = model.led_face;
+  jewel.add(new THREE.Mesh(new THREE.CylinderGeometry(11.5, 11.5, 1.6, 48), mat(0x1d1d1d)));
+  meshes.jewelLeds = [];
+  for (let i = 0; i < 7; i++) {
+    const led = new THREE.Mesh(new THREE.BoxGeometry(5, 1.2, 5), new THREE.MeshBasicMaterial({color: 0}));
+    const a = (i - 1) * Math.PI / 3, r = i ? 8.6 : 0;
+    led.position.set(r * Math.cos(a), 1.2, r * Math.sin(a));
+    jewel.add(led);
+    meshes.jewelLeds.push(led);
+  }
+  tilt.add(jewel);
+  meshes.jewel = jewel;
+  // a little light spills out of the iris onto the lids and frame
+  meshes.glow = new THREE.PointLight(0xff0000, 0, 260, 1.6);
+  meshes.glow.position.set(0, model.r_eye + 6, 0);
+  tilt.add(meshes.glow);
+  $('#loading').remove();
+}
+
+// ---------------- the eye ----------------
+let eyes = [], eyeCfg = null, saved = null, tries = {}, fromParent = null;
+let simNow = 0, speed = 1;
+const sim = new EyeBehavior(configFromJson({}), 0);
+
+function applyConfig() {
+  const c = configFromJson(fromParent || saved?.firmware || {});
+  Object.assign(c, tries);
+  sim.cfg = c;
+  drawPad();
+}
+
+const TRIES = [['spookyEnabled', 'Spooky'], ['startle', 'Startle'], ['blinkEnabled', 'Blink'], ['wanderEnabled', 'Wander'],
+               ['sleepEnabled', 'Sleep'], ['lidFollow', 'Lids follow gaze'], ['irisEnabled', 'Iris colours']];
+function renderTries() {
+  const base = configFromJson(fromParent || saved?.firmware || {});
+  $('#tries').innerHTML = TRIES.map(([k, label]) =>
+    `<label><input type="checkbox" data-try="${k}" ${(tries[k] ?? base[k]) ? 'checked' : ''}> ${label}</label>`).join('');
+  $('#tries').querySelectorAll('input').forEach(cb => cb.onchange = () => {
+    if (cb.checked === base[cb.dataset.try]) delete tries[cb.dataset.try];
+    else tries[cb.dataset.try] = cb.checked;
+    applyConfig();
+  });
+}
+$('#resetTries').onclick = () => { tries = {}; renderTries(); applyConfig(); };
+
+async function loadConfig() {
+  const cfg = await api('/api/config');
+  Units.fromConfig(cfg);
+  eyes = cfg.eyes || [];
+  const want = params.get('eye') || eyeCfg?.id || eyes[0]?.id;
+  eyeCfg = eyes.find(e => e.id === want) || eyes[0];
+  const sel = $('#eye');
+  if (sel.options.length !== eyes.length)
+    sel.innerHTML = eyes.map(e => `<option value="${e.id}">${e.name || e.id}</option>`).join('');
+  sel.value = eyeCfg?.id;
+  const changed = JSON.stringify(saved?.firmware) !== JSON.stringify(eyeCfg?.firmware);
+  saved = eyeCfg;
+  if (changed) { applyConfig(); renderTries(); }
+  $('#eyesLink').href = `/#eyes/${eyeCfg?.id || ''}`;
+}
+$('#eye').onchange = () => {
+  params.set('eye', $('#eye').value);
+  history.replaceState(null, '', '?' + params);
+  tries = {}; seen = {};
+  loadConfig();
+};
+// The Eyes tab embeds this page and sends its unsaved form here, so edits show before you save.
+addEventListener('message', e => {
+  if (e.origin !== location.origin || e.data?.type !== 'eyesim:firmware') return;
+  fromParent = e.data.firmware;
+  applyConfig();
+});
+
+// ---------------- mirror the tracker ----------------
+let drive = 'mirror', seen = {};
+async function pollSent() {
+  if (drive !== 'mirror' || !eyeCfg) return;
+  let sent;
+  try { sent = await api(`/api/eyes/${eyeCfg.id}/sent`); } catch { return; }
+  // replay in the order they were sent, each at the time it was sent
+  const fresh = Object.entries(sent).map(([k, m]) => ({k, m, at: simNow - m.age * 1000}))
+    .filter(({k, at}) => at > (seen[k] ?? -Infinity) + 1).sort((a, b) => a.at - b.at);
+  for (const {k, m, at} of fresh) {
+    seen[k] = at;
+    if (k === 'look') {
+      if (simNow - at < 700) sim.onLook({hasTarget: !!m.tgt, pan: m.pan, tilt: m.tilt, atMs: at}, !!m.new);
+    } else if (k === 'manual') {
+      sim.onManual({pan: m.pan, tilt: m.tilt, lid: m.lid, rawUs: m.raw || [0, 0, 0, 0], untilMs: at + (m.hold_s ?? 15) * 1000});
+    } else if (k === 'identify') {
+      sim.identify(!!m.on, m.rgb || [0, 255, 255], (m.hold_s ?? 60) * 1000, at);
+    } else if (k === 'release') {
+      sim.release();
+    }
+  }
+  const look = sent.look;
+  $('#lastcmd').textContent = !Object.keys(sent).length ? 'Nothing has been sent to this eye yet.'
+    : look ? (look.age > 2 ? `Last look ${Math.round(look.age)} s ago.` : look.tgt ? `Tracking: pan ${look.pan}°, tilt ${look.tilt}°.` : 'Tracker sees nobody for this eye.') : '';
+}
+async function pollReal() {
+  if (!eyeCfg || embed) return;
+  try {
+    const st = (await api('/api/state')).eyes[eyeCfg.id];
+    $('#status').textContent = st?.online ? `Real eye: ${st.activity}` : 'Real eye: offline';
+  } catch { $('#status').textContent = ''; }
+}
+
+// ---------------- demo: you are the person ----------------
+let person = null, wasPerson = false, walking = null, lastLookMs = -1e9;
+const PAD = {xMax: 5, yMax: 8};                 // metres either side / ahead of the eye
+const pad = $('#pad'), pctx = pad.getContext('2d');
+const eyeHeight = () => eyeCfg?.position?.[2] ?? 1.2;
+
+function padXY(ev) {
+  const r = pad.getBoundingClientRect(), s = Math.min(r.width / (2 * PAD.xMax), (r.height - 16) / PAD.yMax);
+  return {x: (ev.clientX - r.left - r.width / 2) / s, y: (r.bottom - 10 - ev.clientY) / s};
+}
+function drawPad() {
+  const r = pad.getBoundingClientRect();
+  if (!r.width) return;
+  pad.width = r.width * devicePixelRatio; pad.height = r.height * devicePixelRatio;
+  const c = pctx, css = getComputedStyle(document.body);
+  c.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  c.clearRect(0, 0, r.width, r.height);
+  const s = Math.min(r.width / (2 * PAD.xMax), (r.height - 16) / PAD.yMax), ox = r.width / 2, oy = r.height - 10;
+  const P = (x, y) => [ox + x * s, oy - y * s];
+  // grid: 1 m or 3 ft
+  const step = Units.imperial ? 3 * 0.3048 : 1;
+  c.strokeStyle = css.getPropertyValue('--line'); c.lineWidth = 1;
+  for (let d = step; d < PAD.yMax * 1.5; d += step) {
+    c.beginPath(); c.arc(ox, oy, d * s, Math.PI, 2 * Math.PI); c.stroke();
+  }
+  c.fillStyle = css.getPropertyValue('--muted'); c.font = '11px system-ui';
+  c.fillText(`rings every ${Units.len(step, 0)}`, 6, 14);
+  // where the eye can reach (its pan limits)
+  const cf = sim.cfg, a0 = rad(cf.pan.minDeg), a1 = rad(cf.pan.maxDeg), R = PAD.yMax * 1.5 * s;
+  c.fillStyle = 'rgba(194,65,12,.09)';
+  c.beginPath(); c.moveTo(ox, oy); c.arc(ox, oy, R, -Math.PI / 2 + a0, -Math.PI / 2 + a1); c.closePath(); c.fill();
+  // gaze
+  const g = rad(sim.pose().pan);
+  c.strokeStyle = css.getPropertyValue('--accent'); c.lineWidth = 2;
+  c.beginPath(); c.moveTo(ox, oy); c.lineTo(ox + Math.sin(g) * R, oy - Math.cos(g) * R); c.stroke();
+  c.fillStyle = css.getPropertyValue('--text');
+  c.beginPath(); c.arc(ox, oy, 5, 0, 2 * Math.PI); c.fill();
+  if (person) {
+    const [px, py] = P(person.x, person.y);
+    c.fillStyle = css.getPropertyValue('--accent');
+    c.beginPath(); c.arc(px, py, 7, 0, 2 * Math.PI); c.fill();
+    c.fillStyle = css.getPropertyValue('--muted');
+    c.fillText(Units.len(Math.hypot(person.x, person.y)), px + 10, py + 4);
+  }
+}
+let padDown = false;
+pad.onpointerdown = ev => { padDown = true; pad.setPointerCapture(ev.pointerId); walking = null; person = padXY(ev); };
+pad.onpointermove = ev => { if (padDown) person = padXY(ev); };
+pad.onpointerup = () => padDown = false;
+$('#nobody').onclick = () => { person = null; walking = null; };
+$('#walk').onclick = () => { walking = {t0: simNow, y: 2.2, v: 1.3}; };
+const heightIn = $('#height');
+const showHeight = () => $('#heightOut').textContent = Units.height(+heightIn.value);
+heightIn.oninput = showHeight;
+const SPEEDS = [1, 2, 5, 10];
+$('#speed').oninput = () => { speed = SPEEDS[$('#speed').value]; $('#speedOut').textContent = speed + '×'; };
+
+// the tracker sends ~20 looks a second; so does the demo
+function demoLook() {
+  if (walking) {
+    const x = -PAD.xMax + walking.v * (simNow - walking.t0) / 1000;
+    if (x > PAD.xMax) { walking = null; person = null; } else person = {x, y: walking.y};
+  }
+  if (simNow - lastLookMs < 50) return;
+  lastLookMs = simNow;
+  if (!person) { sim.onLook({hasTarget: false, pan: 0, tilt: 0, atMs: simNow}, false); wasPerson = false; return; }
+  const dist = Math.hypot(person.x, person.y);
+  const p = deg(Math.atan2(person.x, person.y)), t = deg(Math.atan2(+heightIn.value - eyeHeight(), dist));
+  sim.onLook({hasTarget: true, pan: p, tilt: t, atMs: simNow}, !wasPerson);
+  wasPerson = true;
+}
+
+document.querySelectorAll('input[name=drive]').forEach(r => r.onchange = () => {
+  drive = document.querySelector('input[name=drive]:checked').value;
+  document.querySelectorAll('[data-for]').forEach(el => el.hidden = el.dataset.for !== drive);
+  sim.release(); sim.identify(false, [0, 0, 0], 0, simNow);
+  person = null; walking = null; seen = {};
+  if (drive === 'mirror') { speed = 1; $('#speed').value = 0; $('#speedOut').textContent = '1×'; }
+  setTimeout(drawPad);
+});
+
+// ---------------- aim by hand: drag the eyeball (demo) ----------------
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let aiming = false;
+function eyeHit(ev) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  return ray;
+}
+function aimAt(ev) {
+  // aim at where the pointer ray crosses a wall 200 mm in front of the eye
+  const rr = eyeHit(ev), p = new THREE.Vector3();
+  if (!rr.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, -1, 0), 200), p)) return;
+  sim.onManual({pan: deg(Math.atan2(p.x, p.y)), tilt: deg(Math.atan2(p.z, Math.hypot(p.x, p.y))), lid: 1,
+                rawUs: [0, 0, 0, 0], untilMs: simNow + 15000});
+  $('#release').hidden = false;
+}
+renderer.domElement.addEventListener('pointerdown', ev => {
+  if (drive !== 'demo' || !meshes.sclera || ev.button !== 0) return;
+  const hit = eyeHit(ev).intersectObjects([meshes.sclera, meshes.iris])[0];
+  if (!hit) return;
+  aiming = true; controls.enabled = false;
+  renderer.domElement.setPointerCapture(ev.pointerId);
+  aimAt(ev);
+});
+renderer.domElement.addEventListener('pointermove', ev => { if (aiming) aimAt(ev); });
+renderer.domElement.addEventListener('pointerup', () => { aiming = false; controls.enabled = true; });
+$('#release').onclick = () => { sim.release(); $('#release').hidden = true; };
+
+// ---------------- view toggles ----------------
+const cut = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);   // keeps x <= 0: a slice through the middle
+const SHOWS = [['frame', 'Frame', true], ['servos', 'Servos', true], ['lids', 'Eyelids', true], ['front', 'Eye front', true],
+               ['cut', 'Cut in half', false], ['day', 'Daylight', false]];
+const show = Object.fromEntries(SHOWS.map(([k, , on]) => [k, on]));
+$('#shows').innerHTML = SHOWS.map(([k, label, on]) =>
+  `<label><input type="checkbox" data-show="${k}" ${on ? 'checked' : ''}> ${label}</label>`).join('');
+$('#shows').querySelectorAll('input').forEach(cb => cb.onchange = () => { show[cb.dataset.show] = cb.checked; applyShow(); });
+function applyShow() {
+  if (!meshes.frame) return;
+  meshes.frame.visible = show.frame;
+  meshes.stalk.visible = show.frame;
+  meshes.servos.visible = show.servos;
+  lidU.visible = lidL.visible = show.lids;
+  meshes.sclera.visible = meshes.iris.visible = show.front;
+  renderer.clippingPlanes = show.cut ? [cut] : [];
+  hemi.intensity = show.day ? 1.6 : 0.35;
+  sun.intensity = show.day ? 1.8 : 0.35;
+  scene.background = new THREE.Color(show.day ? 0xb9c3cc : 0x0b0a0a);
+}
+document.querySelectorAll('[data-cam]').forEach(b => b.onclick = () => setCam(b.dataset.cam));
+
+// ---------------- loop ----------------
+const col = new THREE.Color();
+const css = rgb => `rgb(${rgb.join(',')})`;
+function paintLeds() {
+  const {centre, ring} = sim.leds;
+  // emissive: what the LEDs push through the 0.8 mm iris window / 1.2 mm white wall
+  const glowOf = (m, rgb, gain) => { m.emissive.setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace); m.emissiveIntensity = gain; };
+  glowOf(MATS.iris, centre, 1.6);
+  glowOf(MATS.sclera, ring, 0.8);
+  meshes.jewelLeds.forEach((led, i) => led.material.color.setRGB(...(i ? ring : centre).map(v => v / 255), THREE.SRGBColorSpace));
+  col.setRGB(centre[0] / 255, centre[1] / 255, centre[2] / 255, THREE.SRGBColorSpace);
+  meshes.glow.color.copy(col);
+  meshes.glow.intensity = (centre[0] + centre[1] + centre[2]) / 765 * 2500;
+}
+function hud() {
+  const p = sim.pose(), act = sim.activity(simNow);
+  $('#act').textContent = act;
+  $('#pose').textContent = `pan ${p.pan.toFixed(1)}° · tilt ${p.tilt.toFixed(1)}° · lids ${Math.round(p.upper * 100)}% / ${Math.round(p.lower * 100)}%`;
+  $('#ledinfo').innerHTML = `iris<span class="sw" style="background:${css(sim.leds.centre)}"></span>` +
+    `white<span class="sw" style="background:${css(sim.leds.ring)}"></span>` +
+    ` <span style="opacity:.7">servos ${sim.us.join(' · ')} µs</span>`;
+  const idle = (simNow - sim.lastTargetMs) / 1000, c = sim.cfg;
+  $('#why').textContent = act === 'hold' ? `lost the person — holding for ${c.trackHold} s`
+    : (act === 'wander' || act === 'idle') && c.sleepEnabled ? `nobody for ${Math.floor(idle)} s · sleeps at ${c.sleepAfter} s`
+    : act === 'manual' ? `held by hand for ${Math.max(0, Math.ceil((sim.manual.untilMs - simNow) / 1000))} s` : '';
+}
+function resize() {
+  const {width, height} = view.getBoundingClientRect();
+  renderer.setSize(width, height, false);
+  camera.aspect = width / Math.max(1, height);
+  camera.updateProjectionMatrix();
+  drawPad();
+}
+new ResizeObserver(resize).observe(view);
+
+let last = performance.now(), padTick = 0;
+function frame(t) {
+  const dt = Math.min(100, t - last);
+  last = t;
+  simNow += dt * speed;
+  if (drive === 'demo') demoLook();
+  sim.update(simNow);
+  if (meshes.frame) {
+    const p = sim.pose();
+    pan.rotation.z = -rad(p.pan);                 // +pan = to the eye's right (+X)
+    tilt.rotation.x = rad(p.tilt);                // +tilt = up
+    lidU.rotation.x = rad(p.upper * model.lid_open);
+    lidL.rotation.x = -rad(p.lower * model.lid_open);
+    paintLeds();
+  }
+  hud();
+  if (drive === 'demo' && (padTick = (padTick + 1) % 3) === 0) drawPad();
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+setCam(embed ? 'front' : 'angle');
+applyShow();
+showHeight();
+await loadConfig().catch(e => $('#status').textContent = 'Could not read the config: ' + e.message);
+showHeight();
+requestAnimationFrame(frame);
+await loadModel().catch(e => $('#loading').textContent = 'Could not load the model: ' + e.message);
+applyShow();
+setInterval(pollSent, 100);
+setInterval(() => loadConfig().catch(() => {}), 3000);   // pick up settings saved on the Eyes tab
+setInterval(pollReal, 1000);
+</script>
+</body>
+</html>

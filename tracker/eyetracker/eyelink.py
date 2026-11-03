@@ -26,6 +26,7 @@ class EyeLink:
         self._acked_ver: dict[str, int] = {}
         self._lock = threading.Lock()
         self.last_look: dict[str, dict] = {}
+        self._sent: dict[str, dict] = {}         # eye id -> {kind: (time, msg)} for the simulator
 
     def start(self):
         threading.Thread(target=self._recv_loop, name="eyelink-rx", daemon=True).start()
@@ -39,6 +40,8 @@ class EyeLink:
         return None
 
     def send(self, eye: dict, msg: dict):
+        if msg["t"] in ("look", "manual", "identify", "release"):
+            self._sent.setdefault(eye["id"], {})[msg["t"]] = (time.time(), msg)
         try:
             self.sock.sendto(json.dumps(msg, separators=(",", ":")).encode(), (eye["ip"], eye.get("port", 4210)))
         except OSError as exc:
@@ -76,6 +79,11 @@ class EyeLink:
             ev.clear()
         log.warning("%s: config push not acknowledged", eye["id"])
         return False
+
+    def sent(self, eye_id: str) -> dict:
+        """The last look/manual/identify/release sent to an eye, each with its age in seconds."""
+        now = time.time()
+        return {k: {**msg, "age": round(now - at, 3)} for k, (at, msg) in self._sent.get(eye_id, {}).items()}
 
     # ---------- receiving ----------
     def _recv_loop(self):

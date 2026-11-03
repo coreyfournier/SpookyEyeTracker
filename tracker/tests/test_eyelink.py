@@ -110,3 +110,15 @@ def test_look_and_manual_messages(linked, fake_eye):
     assert msgs[1]["t"] == "manual" and msgs[1]["raw"] == [1500, 0, 0, 0]
     assert msgs[2] == {"t": "release"}
     assert msgs[3] == {"t": "identify", "on": 1, "rgb": [0, 255, 255], "hold_s": 30}
+
+
+def test_sent_remembers_the_last_command_of_each_kind(linked):
+    link, eye = linked
+    link.look(eye, True, 10.0, -3.0, new=True)
+    link.manual(eye, pan=4.0, tilt=1.0, lid=0.5)
+    link.look(eye, False)
+    sent = link.sent("eye1")
+    assert set(sent) == {"look", "manual"}            # pings and config pushes aren't replayed
+    assert sent["look"]["tgt"] == 0                   # the latest look wins
+    assert sent["manual"]["lid"] == 0.5 and 0 <= sent["manual"]["age"] < 1
+    assert link.sent("nobody") == {}

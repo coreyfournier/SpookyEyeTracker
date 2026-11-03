@@ -109,3 +109,11 @@ def test_units_setting_round_trips_and_is_validated(app, store):
     r = app.post("/api/settings/save", json={"ui": {"units": "furlongs"}})
     assert r.status_code == 400 and "ui.units" in r.json()["detail"]
     assert store.section("ui") == {"units": "imperial"}
+
+
+def test_sim_page_and_sent_commands(app):
+    assert app.get("/sim").status_code == 200
+    assert app.get("/api/eyes/eye1/sent").json()["look"]["pan"] == 5.0
+    assert app.get("/api/eyes/nope/sent").status_code == 404
+    for part in ("model.json", "eye_front.stl", "frame.stl", "lid_upper.stl"):
+        assert app.get(f"/static/model/{part}").status_code == 200

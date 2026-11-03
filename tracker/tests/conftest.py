@@ -57,6 +57,9 @@ class FakeLink:
     def look(self, *a, **kw):
         pass
 
+    def sent(self, eye_id):
+        return {"look": {"t": "look", "tgt": 1, "pan": 5.0, "tilt": -2.0, "new": 0, "age": 0.1}}
+
 
 @pytest.fixture
 def app(store):

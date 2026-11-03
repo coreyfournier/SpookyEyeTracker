@@ -178,6 +178,10 @@ side, and its USB port stays reachable.
 assembly and prints the result: no part may overlap another, with the lids open or closed
 and with the eye turned ±20° in each direction.
 
+After changing a part, also run `.venv\Scripts\python cad\export_sim.py`. It writes the
+assembled parts (eye-centre coordinates, lighter meshes) to `tracker/eyetracker/static/model/`
+for the [eye simulator](TRACKER.md#eye-simulator).
+
 Main settings at the top of each section of `build.py`:
 
 | Setting | Default | What |

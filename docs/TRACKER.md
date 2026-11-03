@@ -170,6 +170,40 @@ The **Eyes** tab has one card per eye:
 - **Push:** re-sends the saved settings if the eye missed them.
 - **Update firmware…:** uploads a new `firmware.bin` over WiFi (see
   [Firmware → OTA](FIRMWARE.md#over-the-air-updates)).
+- **Simulator:** a 3D model of the eye that behaves as the eye would, including the edits
+  on the card you haven't saved yet. See [Eye simulator](#eye-simulator).
+
+### Eye simulator
+
+Open it from **Eye simulator ↗** in the header (`/sim`), or from the **Simulator** section of
+an eye card. It runs a copy of the firmware's behaviour code (`static/sim/behavior.js`, a
+port of `firmware/src/behavior.cpp`) on the printed parts, so you can see what an eye will
+do without one plugged in.
+
+- **Mirror the tracker:** replays what the tracker sends that eye: who it's tracking, the
+  manual sliders, Identify and Release. Use it to watch tracking from your desk, or to
+  try the servo sliders before the eye is built.
+- **Demo: you play the person:** click or drag in the yard to stand somewhere, or press
+  **Walk past**. The eye startles, tracks, holds when you leave, wanders and then falls
+  asleep. **Speed** fast-forwards its clock, so you don't have to wait 60 s to see sleep.
+  Drag the eyeball to aim it by hand.
+- **Try settings:** turn spooky mode, blinking, wandering and the other behaviours on and
+  off in the simulator only. The saved settings are never changed from here.
+- **View:** turn, zoom and slide the model; hide the frame, servos, lids or the eye front
+  to see the LED insert and Jewel; cut the assembly in half; switch between night and
+  daylight.
+
+The display reads:
+- what the eye is doing;
+- pan, tilt and how far open each lid is;
+- both LED colours;
+- the four servo pulses in µs.
+
+It also says why the eye is doing it, for example "nobody for 12 s · sleeps at 60 s".
+
+The pose comes from the servo pulses read back through the eye's calibration, so raw µs
+from the manual sliders show up as the servo would move. The simulator never sends
+anything to an eye.
 
 ### Cameras: 0, 1 or 2
 
@@ -313,6 +347,7 @@ the eye's aim correction and sends it.
 | `tracker-data/camera_calibration.json` | Camera wizard spots, plus the previous poses for Undo |
 | `.env` | Camera credentials and IPs, `EYE_OTA_PASSWORD` (git-ignored) |
 | `tracker/config.default.yaml` | Commented template for every setting |
+| `tracker/eyetracker/static/model/` | The assembled parts for the simulator, from `cad/export_sim.py` |
 
 ## Tests and CI
 

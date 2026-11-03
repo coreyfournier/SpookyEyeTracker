@@ -90,7 +90,7 @@ cameras and the eyes' aim while you stand in the yard. Take the full tour in
 | `tracker/` | Python tracker and web UI; `config.default.yaml` is the config template; `tests/` has the unit tests |
 | `tracker-data/` | Your live `config.yaml` and calibration data (git-ignored, created on first run) |
 | `firmware/` | PlatformIO project; one environment per eye (`eye1` = HiLetgo OLED kit, `eye2` = Adafruit HUZZAH32 Feather) |
-| `cad/` | `build.py` generates the printable parts into `cad/stl/`; `render.py` draws the pictures in these docs |
+| `cad/` | `build.py` generates the printable parts into `cad/stl/`; `export_sim.py` exports the assembly for the simulator; `render.py` draws the pictures in these docs |
 | `docs/` | The guides linked above, plus images |
 | `Dockerfile`, `docker-compose*.yml` | Container image for the tracker |
 | `.github/workflows/ci.yml` | Tests, firmware compile, Docker build and push |
