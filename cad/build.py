@@ -482,7 +482,31 @@ def frame():
             f -= cyl_z(2.2, zb - BASE_T - 1, zb + 1, x=x, y=y)
     f += window_mount()
     rails = side_rails()
-    return lighten(f, rails) + rails
+    return usb_ports(lighten(f, rails) + rails)
+
+# USB-C power in: a bulkhead (panel-mount) USB-C pigtail through either side wall. Low down and
+# under the rear half of the eye - the eye's bottom (z -51) and the lids' arms (z -28 and up) are
+# all above it - so the cable hangs as close to the window (and the cup) as it can.
+USB_Y, USB_Z = -20.0, -56.0   # hole centre: where the rail runs straight into the lid pivot upright
+USB_R = 7 / 16 * 25.4 / 2 + 0.15   # 7/16in hole + print clearance
+USB_PANEL = 3.0               # wall left at the hole: the counterbore inside takes the nut. MEASURE
+                              # your connector's thread length; 5.0 = no counterbore
+
+def usb_ports(f):
+    """A solid pad (base to the top rail) in each side wall, with the connector hole through it."""
+    zb = -H
+    for x0, x1 in UPRIGHT_X:
+        inner, outer = (x0, x1) if x0 > 0 else (x1, x0)
+        s = 1 if x0 > 0 else -1
+        f += box(x0, x1, USB_Y - 12, USB_Y + 12, zb, USB_Z + 16)
+        tip = CS.square([USB_R * 1.2] * 2, center=True).rotate(45).translate([0, USB_R * 0.55])
+        hole = (circle(USB_R) + tip).hull()                       # teardrop: 45 deg point on top
+        f -= yz_slab(hole.translate([USB_Y, USB_Z]), min(x0, x1) - 1, max(x0, x1) + 1)
+        cb = (circle(10) + CS.square([14.1] * 2, center=True).rotate(45).translate([0, 4.1])).hull()
+        depth = (x1 - x0) - USB_PANEL
+        if depth > 0:
+            f -= yz_slab(cb.translate([USB_Y, USB_Z]), *sorted((inner - s, inner + s * depth)))
+    return f
 
 # Side rails: a low truss along each side that joins the gusset and lid pivot upright at the front
 # to the lid servo cradle at the back (and through it the rear wall), so each side of the frame is

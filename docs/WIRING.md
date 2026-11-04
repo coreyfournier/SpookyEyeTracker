@@ -61,6 +61,15 @@ pin, which is for a 3.7 V LiPo only.
 
 * Do **not** power the servos from the ESP32's 3.3 V or USB 5 V pin - 4 SG90s can stall at over 2 A
   and will brown out the board (random resets / WiFi drops).
+* A USB-C supply (5 V, 3 A or more) works for all of it. Plug it into the panel-mount socket
+  in the frame's side wall ([PRINTED_PARTS.md](PRINTED_PARTS.md#usb-c-power-socket)), and split
+  its 5 V and GND to the servos, jewel and the board's `USB` pin. Don't run the servo current
+  through the board.
+* The pigtail's wires: **V** = 5 V, **G** = ground, **CC**, and D+/D− (leave those two unconnected,
+  insulated). Solder a **5.1 kΩ resistor from CC to G**. That's how a USB-C charger knows a device
+  is attached; without it a C-to-C cable from a USB-C charger gives **no power at all** (a USB-A to
+  C cable from an old-style charger works either way). If it powers up with the plug one way
+  round but not flipped, the pigtail only wires one CC pin - just turn the plug over.
 * If you power the board from the same supply through its 5V pin, don't also plug in USB
   at the same time unless you know your board has a protection diode.
 * The jewel's data line is 3.3 V logic; this nearly always works with the LED at 5 V for short

@@ -22,6 +22,7 @@ lattice frame (left). The frame on its own (right).</i></p>
 - [Printing](#printing)
 - [Window mount](#window-mount)
 - [Mounting the ESP32](#mounting-the-esp32)
+- [USB-C power socket](#usb-c-power-socket)
 - [Generating the STLs](#generating-the-stls)
 - [Rendering](#rendering)
 
@@ -62,6 +63,7 @@ approximate, so check against your prints. Electronics are listed in
 | 2 | M2 / #2 × 6 mm (1/4") coarse-thread self-tapping screws for plastic (ST2.2, pan head) | LED jewel to the LED insert (1.6 mm pilot holes) |
 | 3 | ~1.5 mm steel wire pushrods (or servo linkage kit) | Tilt servo horn to the ball link (~75 mm), and each lid servo horn to its lid's lever (2.2 mm holes, Z-bend the ends) |
 | 4 | M4 screws | Optional: screw the frame down to a shelf instead of hanging it |
+| 1 | [USB-C panel-mount pigtail](https://www.amazon.com/dp/B0D2M91MSJ) (listed with the electronics in [FIRMWARE.md](FIRMWARE.md#shopping-list)) | Power socket: through the 7/16 in hole in either side wall, nut inside |
 | 4 | M2 or M2.5 screws with 5–8 mm standoffs and nuts | ESP32 board to the side rails (drill the holes to suit your board) |
 
 **Filament**
@@ -240,6 +242,21 @@ board clear the rails. A 51 × 26 mm board on 6 mm standoffs still sits inside t
 footprint on either side, clear of the lid servos above it. The HiLetgo's OLED faces out to the
 side, and its USB port stays reachable.
 
+## USB-C power socket
+
+Each side wall has a 7/16 in (11.1 mm) hole for a panel-mount (bulkhead) USB-C pigtail ([this one](https://www.amazon.com/dp/B0D2M91MSJ)), so
+the 5 V supply can plug in from either side. The hole is low on the wall, 20 mm behind the eye's
+centre and 14 mm above the base, in a solid pad that runs from the base to just above the top
+rail. That puts it under the rear half of the eye, forward of all the servos: the eye's lowest
+point and the lids' arms are well above it, and the closer the cable hangs to the window, the
+less its weight levers the frame off the suction cup.
+
+The wall is 5 mm thick there. A 20 mm counterbore on the inside face thins it to 3 mm
+(`USB_PANEL`) for the nut. Check your connector's thread length and change `USB_PANEL` if
+it needs more or less (5.0 removes the counterbore). Use the hole on one side and leave the
+other empty, or fit a second connector there. Inside, run the pigtail back to the board in the
+bay and split the 5 V there, as in [WIRING.md](WIRING.md#power).
+
 ## Generating the STLs
 
 ```powershell
@@ -273,6 +290,7 @@ Main settings at the top of each section of `build.py`:
 | `CUP_Z` | 97 mm | Suction cup height above the eye's centre |
 | `RIB`, `LATTICE` | 3 mm, 24 mm | Lattice rib width and spacing |
 | `BASE_T` | 4 mm | Base and rear (servo) wall thickness |
+| `USB_Y`, `USB_Z`, `USB_PANEL` | -20 mm, -56 mm, 3 mm | USB-C socket hole position (from the eye centre) and the wall thickness left for its nut |
 | `RAIL_W`, `RAIL_PITCH` | 8 mm, 20 mm | Side wall rail height and centre-to-centre spacing (the ESP32 mount) |
 | `RAIL_X` | right 67.5 → 63, left −71 → −63 | Side wall centre line at the servo cradle and at the lid upright (the S-bend joins them) |
 

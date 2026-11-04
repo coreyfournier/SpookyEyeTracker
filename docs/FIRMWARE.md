@@ -41,8 +41,9 @@ Per eye, unless noted.
 | *or* | Adafruit HUZZAH32 ESP32 Feather | Classic ESP32, no display; status on the red LED. Firmware target `featheresp32` |
 | 1 | [WS2812B 7-LED RGB ring ("jewel")](https://www.amazon.com/dp/B0B2D6JDVJ) | One ring per eye; the pack has 7, enough for 7 eyes. Lights the iris and the white of the eye |
 | 4 | SG90 micro servo (9 g) | Pan, tilt, upper lid, lower lid. MG90S (metal gear) is a drop-in upgrade, and worth it for pan: that servo carries the eye on its shaft |
-| 1 | 5 V power supply, **3 A or more** | Powers the servos and LEDs. Four servos can stall at over 2 A, so don't use the ESP32's USB 5 V |
-| 1 | DC barrel jack / screw-terminal adapter | To match the supply's plug |
+| 1 | 5 V USB-C power supply, **3 A or more**, and a USB-C cable | Powers the servos, LEDs and board. Four servos can stall at over 2 A, so don't use a PC port or a 1–2 A phone charger |
+| 1 | [USB-C panel-mount pigtail, 5-wire, 24 AWG](https://www.amazon.com/dp/B0D2M91MSJ) (MEIRIYFA, pack of 5) | Power socket in the frame's 7/16 in side-wall hole. Wires V, G, CC (D+/D− unused). Needs a 5.1 kΩ resistor from CC to G, see [WIRING.md](WIRING.md#power) |
+| 1 | 5.1 kΩ resistor | CC to GND on the pigtail, so a USB-C charger turns its 5 V on |
 | 1 | 1000 µF electrolytic capacitor, 10 V+ | Across 5 V/GND near the servos |
 | 1 | 330 Ω resistor | In series with the LED data line |
 | — | Jumper wires / 22 AWG hookup wire | Servo leads to GPIO 26/27/32/33, shared ground. See [WIRING.md](WIRING.md) |

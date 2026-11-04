@@ -73,7 +73,7 @@ the project before building anything.
 ## What you need
 
 - **Per eye:** an ESP32 board (HiLetgo OLED kit or Adafruit HUZZAH32 Feather), a WS2812B
-  7-LED jewel, four SG90 servos, a 5 V 3 A supply, a large threaded suction cup, a few
+  7-LED jewel, four SG90 servos, a 5 V 3 A USB-C supply and panel-mount socket, a large threaded suction cup, a few
   M2/M3 screws and pins, and about 600 g of PLA. Full lists:
   [electronics](docs/FIRMWARE.md#shopping-list), [hardware and filament](docs/PRINTED_PARTS.md#shopping-list).
 - **Once:** 1-2 cameras: Hikvision, any ONVIF IP camera, any RTSP stream, or a USB webcam;
