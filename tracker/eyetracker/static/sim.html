@@ -200,9 +200,12 @@ function splitIris(geom, irisR, rEye) {
 }
 
 async function loadModel() {
-  model = await (await fetch('/static/model/model.json')).json();
+  // revalidate every time (cheap 304s): the server sends no cache headers, so a browser would
+  // otherwise keep showing parts from before the last export_sim.py
+  model = await (await fetch('/static/model/model.json', {cache: 'no-cache'})).json();
   const loader = new STLLoader();
-  const geoms = await Promise.all(model.parts.map(p => loader.loadAsync(`/static/model/${p}.stl`)));
+  const geoms = await Promise.all(model.parts.map(async p =>
+    loader.parse(await (await fetch(`/static/model/${p}.stl`, {cache: 'no-cache'})).arrayBuffer())));
   const add = (parent, name, geom, m = MATS[name]) => {
     const mesh = new THREE.Mesh(geom, m);
     mesh.name = name;
