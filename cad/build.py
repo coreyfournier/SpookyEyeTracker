@@ -290,7 +290,28 @@ def cradle_plate_x(face, thk_dir, cy, cz, y0, y1, z0, z1, upright=False):
 # lattice cut-outs (print it with 100% infill / solid walls: no hidden infill to print).
 Y_GLASS = 60.0                # glass plane; lids reach y 56.5, so 3.5mm clearance
 PLATE_T = 4.0                 # front plate thickness
-VIEW_R = 40.0                 # hole the eye looks through (80mm; the eye can turn +-25 deg inside it)
+VIEW_R = 40.0                 # eye socket radius SOCKET_D behind the glass
+SOCKET_D = 10.0               # bezel depth (the socket's own wall is the front plate)
+SOCKET_FLARE = 60.0           # socket wall angle from the gaze axis (deg). The wall flares out toward the
+                              # glass like an eye socket, so people well off to the side still see the
+                              # iris (a straight hole hid half of it from 45 deg). It's a 30 deg-from-
+                              # vertical ceiling when the frame prints standing up, so no bridge needed
+SOCKET_W = 8.0                # the socket is stretched this much each side (a stadium): people stand
+                              # off to the sides more than above or below, and the cup pocket is above
+
+def view_r(y):
+    """Eye socket radius at depth y (the half-height; the half-width is SOCKET_W more)."""
+    return VIEW_R + (y - (Y_GLASS - SOCKET_D)) * np.tan(np.radians(SOCKET_FLARE))
+
+def socket(y0, y1):
+    """The eye socket between y0 and y1."""
+    cone = M.cylinder(y1 - y0, view_r(y0), view_r(y1), SEG).rotate([-90, 0, 0]).translate([0, y0, 0])
+    return M.batch_hull([cone.translate([-SOCKET_W, 0, 0]), cone.translate([SOCKET_W, 0, 0])])
+
+def stadium(cs):
+    """Stretch a centred (x, z) outline sideways like the socket."""
+    return (cs.translate([-SOCKET_W, 0]) + cs.translate([SOCKET_W, 0])).hull()
+
 CUP_POCKET_R = 35.0           # suction cup up to 2.68in (68mm) across, pressed flat
 CUP_DEPTH = 14.0              # glass to the back of the cup's hub when pressed on the glass. MEASURE
                               # YOURS: too deep is fine (add cup_shims between hub and pocket floor)
@@ -375,13 +396,15 @@ def cup_housing():
 
 def window_mount():
     """Front plate + cup housing + stiffening ribs + side gussets (before the lattice)."""
-    view = xz_slab(arch(VIEW_R), Y_GLASS - 20, Y_GLASS + 1)
+    view = socket(Y_GLASS - SOCKET_D - 0.01, Y_GLASS + 1)
     pocket = xz_slab(arch(CUP_POCKET_R, 0, CUP_Z), Y_GLASS - CUP_DEPTH, Y_GLASS + 1)
     m = xz_slab(front_outline(), Y_GLASS - PLATE_T, Y_GLASS) + cup_housing()
-    # bezel round the view hole stiffens its edge (lids stay inside r 26 at this depth)
-    # (a 45 deg keel underneath, so its lowest point doesn't start in mid-air)
-    keel = CS([[(-(VIEW_R + RIB), 0), (0, -(VIEW_R + RIB) * np.sqrt(2)), (VIEW_R + RIB, 0)]])
-    m += xz_slab(arch(VIEW_R + RIB) + keel, Y_GLASS - 10, Y_GLASS - PLATE_T)
+    # bezel: a ring behind the plate stiffens the socket's edge. It sits just outside the socket's
+    # back edge, where it can't hide the eye: anything seen through the socket is inside that edge
+    # all the way back. (a 45 deg keel underneath, so its lowest point doesn't start in mid-air)
+    r = view_r(Y_GLASS - PLATE_T)
+    keel = CS([[(-(r + RIB), 0), (0, -(r + RIB) * np.sqrt(2)), (r + RIB, 0)]]) ^ rect(-90, 90, -H - BASE_T, 0)
+    m += xz_slab(stadium(arch(r + RIB) + keel) - stadium(arch(r)), Y_GLASS - SOCKET_D, Y_GLASS - PLATE_T)
     # diagonal ribs behind the plate: carry the cup's pull down to the base corners
     for s in (1, -1):
         rib = (circle(RIB / 2, s * 30, CUP_Z - 20) + circle(RIB / 2, s * 86, -H + RIB / 2 - 0.5)).hull()   # foot on the base
@@ -482,7 +505,7 @@ def lighten(f, extra=M()):
     f -= xz_slab(lattice_holes(rect(-90, 90, zb, 35), keep), REAR_Y - 1, REAR_Y + BASE_T + 0.01)
     # front plate: the view-hole bezel, ribs, cup housing and gussets join it
     keep = section_xz(f, Y_GLASS - PLATE_T - 0.5)
-    region = front_outline() - arch(VIEW_R + RIB) - arch(CUP_POCKET_R + CUP_WALL, 0, CUP_Z)
+    region = front_outline() - stadium(circle(view_r(Y_GLASS) + RIB)) - arch(CUP_POCKET_R + CUP_WALL, 0, CUP_Z)
     f -= xz_slab(lattice_holes(region, keep, border=4), Y_GLASS - PLATE_T - 0.01, Y_GLASS + 1)
     # side walls standing on the base: gussets, servo cradles, lid uprights, pedestal walls
     for x0, x1, y0, y1, z1 in YZ_WALLS:

@@ -146,8 +146,11 @@ diamond lattice cut-outs. The plates stay solid wherever another part joins them
 diagonal ribs carry the cup's pull down to the base corners. **Print it base-down at 100%
 infill (or enough walls to fill 3-4 mm) with no supports.**
 - The lattice diamonds have 60° sides, so they're self-supporting.
-- The view opening and the cup pocket have 45° shoulders up to a 20 mm flat top that
-  bridges.
+- The eye socket's walls flare at 60° from the gaze axis, which is 30° from vertical as the frame
+  stands, so they need no support.
+- The cup pocket has 45° shoulders up to a 20 mm flat top that bridges.
+- The stiffening ring behind the socket has a 45° keel underneath, and its top runs into the
+  cup pocket's chin.
 - The cup pocket has a 45° chin underneath, so nothing starts in mid-air.
 - The only other overhangs are short bridges (23 mm or less) across the tops of lattice
   holes and servo pockets, and where the side rails' top rail closes over the truss (16 mm or less).
@@ -158,7 +161,7 @@ Z height.
 ## Window mount
 
 `frame.stl` hangs the whole eye on the inside of a window. Its front plate sits flat
-against the glass, with an arched opening the eye looks out through. Above the eye is a
+against the glass, with a flared socket the eye looks out through. Above the eye is a
 pocket for one large threaded suction cup (up to 2.68" / 68 mm across, 8-32 stud):
 
 1. Press the cup onto the glass where the eye should go.
@@ -177,8 +180,24 @@ The assembled eye weighs roughly 600-650 g with servos and electronics. One cup 
 for 7 lb (3 kg). Because the weight hangs behind the glass, the cup carries the pull and
 the bottom of the frame presses against the glass.
 
-The eye's centre sits 60 mm behind the glass, so the eye and lids never touch it. It can
-turn ±25° inside the 80 mm opening.
+The eye's centre sits 60 mm behind the glass, so the eye and lids never touch it.
+
+The socket is shaped like an eye socket, so people off to the side can still see the eye. Its
+walls flare out toward the glass at 60°, and it's 16 mm wider than it is tall, because people
+stand to the sides more than above or below. The cup pocket sits above it. At the glass it is
+131 × 115 mm (W × H).
+
+A stiffening ring sits behind the plate, just outside the socket's back edge. Nothing seen
+through the socket can pass behind it, so the ring never hides the eye.
+
+How much of the iris a person sees, with the eye turned toward them as far as it goes (±25°):
+
+| Person stands off to the side by | 30° | 45° | 60° | 70° |
+|---|---|---|---|---|
+| Straight 80 mm hole (before) | 75% | 55% | 28% | 12% |
+| Flared socket | 100% | 98% | 78% | 51% |
+
+Beyond about 60°, the side walls that tie the front plate to the base hide the rest.
 
 ## Mounting the ESP32
 
@@ -212,7 +231,7 @@ side, and its USB port stays reachable.
 
 `cad/build.py` writes every part to `cad/stl/`, in its print orientation. It then checks the
 assembly and prints the result: no part may overlap another, with the lids open or closed
-and with the eye turned ±20° in each direction.
+and at every corner of the eye's pan (±25°) and tilt (±15°) range.
 
 After changing a part, also run `.venv\Scripts\python cad\export_sim.py`. It writes the
 assembled parts (eye-centre coordinates, lighter meshes) to `tracker/eyetracker/static/model/`
@@ -228,7 +247,9 @@ Main settings at the top of each section of `build.py`:
 | `LID_OPEN` | 45° | Eyelid travel |
 | `JEWEL_HOLE_X` | 9.2 mm | Half the jewel's mounting-hole spacing. Measure yours |
 | `Y_GLASS` | 60 mm | Glass plane, measured forward from the eye's centre |
-| `VIEW_R` | 40 mm | Radius of the opening the eye looks through |
+| `VIEW_R` | 40 mm | Eye socket half-height, 10 mm behind the glass |
+| `SOCKET_FLARE` | 60° | How far the socket's walls flare out toward the glass |
+| `SOCKET_W` | 8 mm | How much wider than tall the socket is, each side |
 | `CUP_POCKET_R` | 35 mm | Suction cup pocket radius (fits a 68 mm cup) |
 | `CUP_DEPTH` | 14 mm | Glass to the back of the cup's hub |
 | `CUP_Z` | 97 mm | Suction cup height above the eye's centre |
