@@ -267,6 +267,29 @@ def lid(upper=True):
         L = L.mirror([0, 0, 1]).mirror([1, 0, 0])
     return L
 
+def lid_print(upper=True):
+    """A lid in its print orientation: front edge down, shell leaning back over the pivot.
+    (The lower lid is the upper one turned 180 deg about Y, so this turns it back.)"""
+    return lid(True) if upper else lid(False).rotate([0, 180, 0])
+
+def lid_supports(upper=True):
+    """Snap-off supports for printing a lid (as lid_print). It stands on its pivot bosses, so
+    the shell's front edge starts 7.5mm up and the lever slopes up from the boss to a hanging
+    tip: a curtain under the front edges and a block under the lever, PRINT_GAP below each."""
+    L = lid_print(upper)
+    xin, xout = (53, 56) if upper else (56.5, 59.5)
+    bed = L.bounding_box()[2]
+    clear = L + L.translate([0, 0, -PRINT_GAP]) + cyl_x(7.5, -70, 70)   # the bosses stand on the bed
+    # curtain: the front edges are within 1mm of the pivot's height, and everything there leans
+    # back, so the cut just above them is the outline to hold up
+    curtain = L.slice(1.5).offset(-0.4, JoinType.Round).extrude(1.5 - bed).translate([0, 0, bed])
+    # lever: columns from the bed to just under it (its underside is the plane z = -4, tilted
+    # with it). It's on the +X side of the print, whichever lid it is
+    lever = (L ^ box(xin - 1, xout + 1, -60, -7.5, -60, 60)).project().offset(-0.4, JoinType.Round)
+    below = box(xin - 1, xout + 1, -60, 10, -60, -4 - PRINT_GAP).rotate([-20, 0, 0])
+    block = lever.extrude(30).translate([0, 0, bed]) ^ below
+    return (curtain + block) - clear
+
 # ---------------- SERVO CRADLES / FRAME ----------------
 SV_L, SV_W, EAR = 22.8, 12.4, 13.9   # SG90 body + ear hole offset
 
@@ -432,6 +455,11 @@ def frame():
     for x0, x1 in UPRIGHT_X:                                        # lid pivot uprights
         up = M.batch_hull([box(x0, x1, -30, 30, zb, zb + 1), box(x0, x1, -12, 12, -1, 0),
                            cyl_x(12, x0, x1)])
+        # fill the notch between the upright and the gusset's sloping edge, so the wall's top only
+        # rises toward the front: a lattice hole under a V notch has a V top, and the tip of the
+        # wall above it would start in mid-air. (Its corners sit 1mm inside the gusset at y=15 and 40)
+        g = lambda y: -H + (y + 40) * (40 + H) / (Y_GLASS - PLATE_T + 40)   # gusset edge height
+        up += M.batch_hull([cyl_x(12, x0, x1)] + [box(x0, x1, y - 0.1, y, g(y) - 1.1, g(y) - 1) for y in (15, 40)])
         f += up - cyl_x(TAP, x0 - 1, x1 + 1)
     f += box(-90, 90, REAR_Y, REAR_Y + BASE_T, zb, 35)              # rear wall
     # stalk pedestal: a channel (top plate + two side walls) with bosses for the stalk screws
@@ -524,8 +552,10 @@ def lighten_yz(f, x0, x1, y0, y1, z0, z1):
     win = box(x0, x1, y0, y1, z0, z1)
     region = section_yz(f ^ win, (x0 + x1) / 2)
     # + a diamond round the lid pivot (y=z=0): its 45 deg underside gives the holes below sloped
-    # ceilings (a circle's flat bottom would leave them overhanging)
-    keep = section_yz(f, x0 - 0.5) + section_yz(f, x1 + 0.5) + CS.square([24, 24], center=True).rotate(45)
+    # ceilings (a circle's flat bottom would leave them overhanging). A post runs down from its
+    # bottom corner to the base, or that corner would start in mid-air at the top of a hole
+    keep = (section_yz(f, x0 - 0.5) + section_yz(f, x1 + 0.5) + CS.square([24, 24], center=True).rotate(45)
+            + rect(-RIB / 2, RIB / 2, -H - BASE_T, 0))
     holes = lattice_holes(region, keep, border=4)
     return f - yz_slab(holes, x0 - 0.01, x1 + 0.01) if not holes.is_empty() else f
 
@@ -595,7 +625,9 @@ if __name__ == "__main__":
         eye_rear=(rear + rear_boss_supports()).rotate([-90, 0, 0]),   # snap-off boss supports
         eye_rear_nosupport=rear.rotate([-90, 0, 0]),
         yoke=yk, stalk=st.rotate([0, 90, 0]), led_insert=li.rotate([90, 0, 0]),
-        frame=fr, lid_upper=lu, lid_lower=ll, cup_shims=cup_shims())
+        frame=fr, cup_shims=cup_shims(),
+        lid_upper=lid_print(True) + lid_supports(True), lid_lower=lid_print(False) + lid_supports(False),
+        lid_upper_nosupport=lid_print(True), lid_lower_nosupport=lid_print(False))
     for k, v in printable.items():
         bb = v.bounding_box()
         v = v.translate([-(bb[0] + bb[3]) / 2, -(bb[1] + bb[4]) / 2, -bb[2]])

@@ -39,7 +39,7 @@ lattice frame (left). The frame on its own (right).</i></p>
 | `yoke.stl` | Gimbal cross-piece: the eye pivots on its ends (tilt), and it sits on the pan servo's horn (pan) |
 | `stalk.stl` | Arm from the frame's pedestal into the eye, with a cradle for the pan servo under the yoke |
 | `cup_shims.stl` | Spacers (1, 2 and 4 mm) for the suction cup pocket, if needed |
-| `*_nosupport.stl` | Versions of the eye halves without the built-in snap-off supports |
+| `*_nosupport.stl` | Versions of the eye halves and lids without the built-in snap-off supports |
 | `ASSEMBLY_*.stl` | Everything in place, for checking (not for printing) |
 
 ## Shopping list
@@ -141,6 +141,21 @@ collisions, including the rod, and that the rod's length doesn't change with pan
 - `eye_rear.stl` has snap-off blocks under its pivot bosses and under the tilt post. `yoke.stl`
   sits flat (the horn pocket underneath bridges 6.6 mm), and `stalk.stl` prints on its side.
 
+**Eyelids.** Both lids print the same way up: standing on their pivot bosses, with the front
+edge down and the shell leaning back over the pivot.
+- That leaves the front edge 7.5 mm above the bed and the lever arm hanging, so each lid
+  includes snap-off supports: a thin curtain under the front edge and a block under the lever.
+  Each one stops a layer (0.2 mm) short of the lid, so print at 0.2 mm layers with **slicer
+  supports off**, and snap them off afterwards.
+- The inside of the shell leans back up to 70° near the top, which leaves it a little rough,
+  but that side faces the eye.
+- `lid_upper_nosupport.stl` and `lid_lower_nosupport.stl` are the same lids without the supports,
+  for slicer-generated ones.
+
+**Slicer warnings.** Bambu Studio and other slicers flag any spot that starts in mid-air as
+"floating". The only part that should still ask for supports is `eye_front.stl`, for the inside of
+the iris dome (see above). If any other part does, the STL is probably stale: rerun `build.py`.
+
 **Frame.** To save filament and print time, every wall of the frame is a thin plate with
 diamond lattice cut-outs. The plates stay solid wherever another part joins them, and
 diagonal ribs carry the cup's pull down to the base corners. **Print it base-down at 100%
@@ -152,6 +167,9 @@ infill (or enough walls to fill 3-4 mm) with no supports.**
 - The stiffening ring behind the socket has a 45° keel underneath, and its top runs into the
   cup pocket's chin.
 - The cup pocket has a 45° chin underneath, so nothing starts in mid-air.
+- In each side wall, a post runs from the lid pivot down to the base, and the wall's top edge
+  rises steadily from the pivot to the front plate. Otherwise a lattice hole would end in a
+  downward point and the wall above it would start in mid-air.
 - The only other overhangs are short bridges (23 mm or less) across the tops of lattice
   holes and servo pockets, and where the side rails' top rail closes over the truss (16 mm or less).
 
