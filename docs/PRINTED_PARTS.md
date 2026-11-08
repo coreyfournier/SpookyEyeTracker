@@ -106,6 +106,14 @@ gears the tilt about 2.4:1 on the horn's 8 mm hole (about 36° of servo for ±15
 collisions, including the rod, and that the rod's length doesn't change with pan.
 
 **Assembling the gimbal:**
+
+Before you start, break off all the snap-off supports. They're joined by a 0.2 mm air gap, so
+pliers or a small screwdriver lever them off. Any you miss will stop the parts fitting:
+- `eye_front`: the thin ring around the bayonet lip.
+- `eye_rear`: a block under each side pivot boss, and a tall block under the tilt post at the
+  top. All three stand right where the front's lip goes.
+- The lids: the curtain under the front edge and the block under the lever.
+
 1. Screw the pan servo into the stalk's cradle, shaft up. Screw a ball stud up into the
    post inside `eye_rear`, leaving the ball about 4–5 mm below the post.
 2. Centre the pan servo (flash the firmware with the horn off: it goes to `center`), then
@@ -119,7 +127,17 @@ collisions, including the rod, and that the rod's length doesn't change with pan
    rod's ball link onto the ball. Z-bend the rod's other end into the tilt servo horn's 8 mm
    hole, with the horn pointing up and the eye looking straight ahead.
 5. Twist-lock `eye_front` (with the LED insert) onto the rear. Route the servo and LED
-   wires out through the rear opening along the stalk.
+   wires out through the rear opening along the stalk. The joint is a bayonet:
+   - `eye_front` has a short lip (3.3 mm) standing out past its rim, with three small lugs on
+     the outside.
+   - `eye_rear` has a matching step inside its rim, 3.5 mm deep, with three notches in its wall
+     that turn sideways at the bottom (L-shaped slots).
+   - Line the lugs up with the notches and push the front straight in until the rims meet.
+     Then, looking at the iris, turn the front 15° clockwise until it clicks. Counter-clockwise
+     and pull takes it off.
+   - Won't go in? Check all the snap-off supports above are off. If it's still tight, the first
+     layer has probably spread (elephant's foot): shave the bottom edge of the lip and the
+     mouth of the step with a hobby knife.
 
 ## Printing
 
